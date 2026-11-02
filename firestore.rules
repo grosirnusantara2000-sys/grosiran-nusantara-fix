@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'nelly.aliya00@gmail.com' ||
+        request.auth.token.email == 'ramadhansyukri.st@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admins registry collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Products catalog: public read, admin write or valid product structure
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin() || (
+        request.resource.data.name is string &&
+        request.resource.data.categoryId is string &&
+        request.resource.data.wholesalePrice is number &&
+        request.resource.data.price is number
+      );
+      allow delete: if isAdmin() || isSignedIn();
+    }
+
+    // Categories: public read, admin write or valid category structure
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin() || (
+        request.resource.data.name is string &&
+        request.resource.data.slug is string
+      );
+      allow delete: if isAdmin() || isSignedIn();
+    }
+
+    // Product requests (Custom sourcing)
+    match /productRequests/{requestId} {
+      allow read: if true;
+      allow create: if request.resource.data.ticketNumber is string &&
+                       request.resource.data.customerName is string &&
+                       request.resource.data.customerWhatsapp is string &&
+                       request.resource.data.itemName is string;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      allow read: if true; // Allows customer and admin to view invoices and tracking
+      allow create: if request.resource.data.invoiceNumber is string &&
+                       request.resource.data.customerName is string &&
+                       request.resource.data.customerWhatsapp is string;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Reviews & Testimonials: public read, create by verified orders, admin manage
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.resource.data.customerName is string &&
+                       request.resource.data.rating is number &&
+                       request.resource.data.comment is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // SEO Blog Articles: public read, admin write
+    match /articles/{articleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Store settings & profile: public read, admin write or valid storeName
+    match /storeSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() || (
+        request.resource.data.storeName is string &&
+        request.resource.data.whatsappNumber is string
+      );
+    }
+
+    // Real-time admin notifications
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow create: if request.resource.data.title is string;
+      allow update, delete: if true;
+    }
+  }
+}

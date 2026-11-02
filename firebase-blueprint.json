@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account information and profile data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["customer", "admin", "staff"] },
+        "address": { "type": "string", "maxLength": 300 },
+        "city": { "type": "string", "maxLength": 100 },
+        "province": { "type": "string", "maxLength": 100 },
+        "postalCode": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Wholesale catalog product available at Pasar Aur Kuning",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "categoryId": { "type": "string", "maxLength": 100 },
+        "categoryName": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "price": { "type": "number" },
+        "wholesalePrice": { "type": "number" },
+        "minOrder": { "type": "number" },
+        "jokiFee": { "type": "number" },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "inStock": { "type": "boolean" },
+        "unit": { "type": "string", "maxLength": 20 },
+        "colors": { "type": "array" },
+        "sizes": { "type": "array" },
+        "estimatedShoppingDay": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "categoryId", "price", "wholesalePrice", "minOrder"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category grouping",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 100 },
+        "slug": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 300 },
+        "icon": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "ProductRequest": {
+      "title": "ProductRequest",
+      "description": "Customer custom request for items not in catalog to be sourced at Pasar Aur Kuning",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "ticketNumber": { "type": "string", "maxLength": 40 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerWhatsapp": { "type": "string", "maxLength": 30 },
+        "itemName": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "quantity": { "type": "string", "maxLength": 100 },
+        "targetBudget": { "type": "string", "maxLength": 100 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "photoUrls": { "type": "array" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Request Diterima",
+            "Sedang Dicarikan",
+            "Barang Ditemukan",
+            "Menunggu Persetujuan Harga",
+            "Disetujui Customer",
+            "Tidak Ditemukan",
+            "Selesai"
+          ]
+        },
+        "adminOffer": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "ticketNumber", "customerName", "customerWhatsapp", "itemName", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase transaction order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "maxLength": 40 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerWhatsapp": { "type": "string", "maxLength": 30 },
+        "customerEmail": { "type": "string", "maxLength": 120 },
+        "shippingAddress": { "type": "object" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "jokiTotal": { "type": "number" },
+        "shippingCost": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "courier": { "type": "string", "maxLength": 60 },
+        "trackingNumber": { "type": "string", "maxLength": 100 },
+        "paymentMethod": { "type": "string", "maxLength": 60 },
+        "paymentStatus": { "type": "string", "enum": ["Menunggu Pembayaran", "Menunggu Verifikasi", "Lunas", "Dibatalkan"] },
+        "orderStatus": {
+          "type": "string",
+          "enum": [
+            "Menunggu Pembayaran",
+            "Pembayaran Dikonfirmasi",
+            "Pesanan Diproses",
+            "Barang Sedang Dibelikan",
+            "Barang Sedang Dikemas",
+            "Pesanan Dikirim",
+            "Selesai",
+            "Dibatalkan"
+          ]
+        },
+        "storeProofPhotos": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "invoiceNumber", "customerName", "customerWhatsapp", "totalAmount", "orderStatus"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Verified customer review and testimonial",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerName", "city", "rating", "comment"]
+    },
+    "Article": {
+      "title": "Article",
+      "description": "SEO blog article about Pasar Aur Kuning wholesale shopping",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "slug": { "type": "string", "maxLength": 150 },
+        "excerpt": { "type": "string", "maxLength": 500 },
+        "content": { "type": "string", "maxLength": 10000 },
+        "tags": { "type": "array" },
+        "readTime": { "type": "string", "maxLength": 20 },
+        "publishedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "slug", "content"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Master admin record identifier",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "super_admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "StoreSettings": {
+      "title": "StoreSettings",
+      "description": "Store profile, contact WhatsApp, email, operational schedule, and Google Sheets Apps Script integration configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 50 },
+        "storeName": { "type": "string", "maxLength": 150 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "whatsappNumber": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 100 },
+        "address": { "type": "string", "maxLength": 300 },
+        "marketDays": { "type": "string", "maxLength": 150 },
+        "operationalHours": { "type": "string", "maxLength": 100 },
+        "googleSheetsWebhookUrl": { "type": "string", "maxLength": 500 },
+        "googleSheetId": { "type": "string", "maxLength": 200 },
+        "autoSyncGoogleSheets": { "type": "boolean" },
+        "instagram": { "type": "string", "maxLength": 100 },
+        "tiktok": { "type": "string", "maxLength": 100 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "storeName", "whatsappNumber", "email"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Admin real-time notification alert",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["order", "request", "payment", "system"] },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles and customer details"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Wholesale products catalog"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Catalog categories"
+    },
+    "/productRequests/{requestId}": {
+      "schema": "ProductRequest",
+      "description": "Sourcing and shopping requests from customers"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchase orders and fulfillment tracking"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Customer testimonials"
+    },
+    "/articles/{articleId}": {
+      "schema": "Article",
+      "description": "SEO educational articles and shopping guides"
+    },
+    "/admins/{adminId}": {
+      "schema": "AdminUser",
+      "description": "Admin authorization registry"
+    },
+    "/storeSettings/{settingId}": {
+      "schema": "StoreSettings",
+      "description": "Store operational profiles and integration settings"
+    },
+    "/notifications/{notifId}": {
+      "schema": "AppNotification",
+      "description": "Admin notifications collection"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Remix Joki Grosir Aur Kuning",
+  "description": "Layanan joki belanja grosir terpercaya dan profesional Pasar Aur Kuning Bukittinggi. Belanja barang grosir tanpa harus datang langsung ke Bukittinggi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
