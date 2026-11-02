@@ -14,6 +14,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'grosirnusantara2000@gmail.com' ||
         request.auth.token.email == 'nelly.aliya00@gmail.com' ||
         request.auth.token.email == 'ramadhansyukri.st@gmail.com'
       );
@@ -25,91 +26,57 @@ service cloud.firestore {
 
     // Admins registry collection
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // User profiles
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
-    // Products catalog: public read, admin write or valid product structure
+    // Products catalog: public read & write
     match /products/{productId} {
-      allow read: if true;
-      allow write: if isAdmin() || (
-        request.resource.data.name is string &&
-        request.resource.data.categoryId is string &&
-        request.resource.data.wholesalePrice is number &&
-        request.resource.data.price is number
-      );
-      allow delete: if isAdmin() || isSignedIn();
+      allow read, write, delete: if true;
     }
 
-    // Categories: public read, admin write or valid category structure
+    // Categories: public read & write
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isAdmin() || (
-        request.resource.data.name is string &&
-        request.resource.data.slug is string
-      );
-      allow delete: if isAdmin() || isSignedIn();
+      allow read, write, delete: if true;
     }
 
     // Product requests (Custom sourcing)
     match /productRequests/{requestId} {
-      allow read: if true;
-      allow create: if request.resource.data.ticketNumber is string &&
-                       request.resource.data.customerName is string &&
-                       request.resource.data.customerWhatsapp is string &&
-                       request.resource.data.itemName is string;
-      allow update: if true;
-      allow delete: if isAdmin();
+      allow read, write, delete: if true;
     }
 
     // Orders
     match /orders/{orderId} {
-      allow read: if true; // Allows customer and admin to view invoices and tracking
-      allow create: if request.resource.data.invoiceNumber is string &&
-                       request.resource.data.customerName is string &&
-                       request.resource.data.customerWhatsapp is string;
-      allow update: if true;
-      allow delete: if isAdmin();
+      allow read, write, delete: if true;
     }
 
-    // Reviews & Testimonials: public read, create by verified orders, admin manage
+    // Reviews & Testimonials: public read, write
     match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if request.resource.data.customerName is string &&
-                       request.resource.data.rating is number &&
-                       request.resource.data.comment is string;
-      allow update, delete: if isAdmin();
+      allow read, write, delete: if true;
     }
 
-    // SEO Blog Articles: public read, admin write
+    // SEO Blog Articles: public read, write
     match /articles/{articleId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write, delete: if true;
     }
 
-    // Store settings & profile: public read, admin write or valid storeName
+    // Store settings & profile: public read and write so owner can customize profile and Google Sheets webhook
     match /storeSettings/{settingId} {
-      allow read: if true;
-      allow write: if isAdmin() || (
-        request.resource.data.storeName is string &&
-        request.resource.data.whatsappNumber is string
-      );
+      allow read, write: if true;
+    }
+
+    // Activity logs: public read and write for audit trail
+    match /activity_logs/{logId} {
+      allow read, write: if true;
     }
 
     // Real-time admin notifications
     match /notifications/{notifId} {
-      allow read: if true;
-      allow create: if request.resource.data.title is string;
-      allow update, delete: if true;
+      allow read, write, delete: if true;
     }
   }
 }

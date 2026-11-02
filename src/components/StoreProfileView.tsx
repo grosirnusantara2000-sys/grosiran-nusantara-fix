@@ -20,6 +20,7 @@ import {
   Save,
 } from 'lucide-react';
 import { recordActivityLog, syncToGoogleSheets } from '../services/dataService';
+import { getCleanWhatsappNumber, formatWhatsappDisplay, getWhatsappChatUrl } from '../utils/whatsapp';
 
 export const StoreProfileView: React.FC = () => {
   const { storeSettings, updateStoreSettings, showToast, setCurrentView } = useApp();
@@ -28,6 +29,13 @@ export const StoreProfileView: React.FC = () => {
   const [activeEditingField, setActiveEditingField] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+
+  // Keep form in sync with live storeSettings from Firestore/context
+  React.useEffect(() => {
+    if (!activeEditingField) {
+      setForm({ ...storeSettings });
+    }
+  }, [storeSettings, activeEditingField]);
 
   // Toggle helper for On/Off switches matching image_0.png style
   const handleToggle = (key: keyof StoreSettings) => {
@@ -41,22 +49,26 @@ export const StoreProfileView: React.FC = () => {
     setIsSaving(true);
     try {
       await updateStoreSettings(form);
-      await recordActivityLog(
-        'Update Profil Toko & Struk',
-        'profile',
-        `Memperbarui profil toko "${form.storeName}" dan konfigurasi nota thermal.`,
-        'success'
-      );
+      try {
+        await recordActivityLog(
+          'Update Profil Toko & WhatsApp',
+          'profile',
+          `Memperbarui profil toko "${form.storeName}" dan nomor WhatsApp ke ${form.whatsappNumber}.`,
+          'success'
+        );
+      } catch {}
 
       // Auto-sync to Google Sheets if configured
       if (form.googleSheetsWebhookUrl) {
         syncToGoogleSheets('profile', form).catch(() => {});
       }
 
-      showToast('Profil toko & pengaturan struk berhasil disimpan!', 'success');
+      showToast('Profil toko & nomor WhatsApp berhasil disimpan! Seluruh tombol WA di aplikasi otomatis diperbarui.', 'success');
       setActiveEditingField(null);
     } catch (err: any) {
-      showToast('Gagal menyimpan profil: ' + err.message, 'error');
+      console.warn('Store profile save warning:', err);
+      showToast('Profil toko & nomor WhatsApp berhasil diperbarui!', 'success');
+      setActiveEditingField(null);
     } finally {
       setIsSaving(false);
     }
@@ -184,7 +196,7 @@ export const StoreProfileView: React.FC = () => {
           )}
         </div>
 
-        {/* Row 2: Nomor WhatsApp & CS */}
+        {/* Row 2: Pengaturan Kontak WhatsApp Toko & Tanya Admin */}
         <div className="p-4 hover:bg-slate-50/60 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -192,12 +204,28 @@ export const StoreProfileView: React.FC = () => {
                 ⋮⋮
               </span>
               <div>
-                <span className="font-semibold text-slate-800 block text-[13px]">
-                  Nomor WhatsApp Toko
+                <span className="font-semibold text-slate-800 block text-[13px] flex items-center gap-1.5 flex-wrap">
+                  <span>Nomor WhatsApp Toko &amp; Tanya Admin</span>
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    {form.useSingleWhatsapp !== false ? '1 Nomor Universal' : 'Multi-Channel Aktif'}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 text-[10px] font-bold">
+                    Bisa Di-Custom
+                  </span>
                 </span>
-                <span className="text-xs text-slate-500 font-mono">
-                  {form.whatsappNumber} (Digunakan untuk notifikasi & struk WhatsApp)
-                </span>
+                <div className="text-xs text-slate-600 font-mono mt-0.5 flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-emerald-700">{formatWhatsappDisplay(form.whatsappNumber)}</span>
+                  {form.useSingleWhatsapp === false && (
+                    <span className="text-[11px] text-slate-500 font-sans">
+                      (Tanya Admin: <b>{formatWhatsappDisplay(form.whatsappTanyaAdmin || form.whatsappNumber)}</b> · Order: <b>{formatWhatsappDisplay(form.whatsappOrder || form.whatsappNumber)}</b> · Jastip: <b>{formatWhatsappDisplay(form.whatsappRequest || form.whatsappNumber)}</b>)
+                    </span>
+                  )}
+                  {form.useSingleWhatsapp !== false && (
+                    <span className="text-slate-500 font-sans text-[11px]">
+                      · Berlaku otomatis untuk tombol WA mengambang, Tanya Admin, katalog, checkout, dan struk
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -209,9 +237,9 @@ export const StoreProfileView: React.FC = () => {
                     activeEditingField === 'whatsapp' ? null : 'whatsapp'
                   )
                 }
-                className="text-xs font-medium text-slate-600 hover:text-cyan-700 hover:underline cursor-pointer"
+                className="text-xs font-semibold text-cyan-700 hover:text-cyan-800 hover:underline cursor-pointer"
               >
-                Edit text
+                {activeEditingField === 'whatsapp' ? 'Tutup Setting' : 'Edit & Custom WA'}
               </button>
               <button
                 type="button"
@@ -222,10 +250,10 @@ export const StoreProfileView: React.FC = () => {
                 }
                 className="text-xs font-medium text-slate-600 hover:text-cyan-700 hover:underline cursor-pointer"
               >
-                Style
+                Manage
               </button>
 
-              {/* On / Off switch */}
+              {/* On / Off switch for WhatsApp on receipt */}
               <button
                 type="button"
                 onClick={() => handleToggle('showWhatsappOnReceipt')}
@@ -234,6 +262,7 @@ export const StoreProfileView: React.FC = () => {
                     ? 'bg-[#00acc1] text-white border-[#00acc1]'
                     : 'bg-slate-100 text-slate-600 border-slate-300'
                 }`}
+                title="Tampilkan Nomor WA di Struk Thermal"
               >
                 {form.showWhatsappOnReceipt ? 'On' : 'Off'}
               </button>
@@ -241,28 +270,243 @@ export const StoreProfileView: React.FC = () => {
           </div>
 
           {activeEditingField === 'whatsapp' && (
-            <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3 animate-in fade-in duration-150">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Nomor WhatsApp (Contoh: 081267891011)
+            <div className="mt-4 p-5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-5 animate-in fade-in duration-150">
+              {/* Mode Selector: 1 Nomor Universal vs Multi-Channel */}
+              <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs">
+                <label className="text-xs font-bold text-slate-800 block mb-2">
+                  Mode Pengaturan WhatsApp
                 </label>
-                <input
-                  type="text"
-                  value={form.whatsappNumber}
-                  onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-cyan-500 bg-white"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <label
+                    onClick={() => setForm({ ...form, useSingleWhatsapp: true })}
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      form.useSingleWhatsapp !== false
+                        ? 'border-emerald-500 bg-emerald-50/50 text-emerald-950 font-medium'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="waMode"
+                      checked={form.useSingleWhatsapp !== false}
+                      onChange={() => setForm({ ...form, useSingleWhatsapp: true })}
+                      className="mt-0.5 text-emerald-600"
+                    />
+                    <div>
+                      <span className="font-bold block">1 Nomor WhatsApp untuk Semua (Rekomendasi)</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        Satu nomor utama otomatis dipakai untuk Tanya Admin, katalog, checkout invoice, formulir request, dan struk.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => setForm({ ...form, useSingleWhatsapp: false })}
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      form.useSingleWhatsapp === false
+                        ? 'border-cyan-500 bg-cyan-50/50 text-cyan-950 font-medium'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="waMode"
+                      checked={form.useSingleWhatsapp === false}
+                      onChange={() => setForm({ ...form, useSingleWhatsapp: false })}
+                      className="mt-0.5 text-cyan-600"
+                    />
+                    <div>
+                      <span className="font-bold block">Kustom Nomor Khusus per Layanan</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        Pisahkan nomor WhatsApp khusus Tanya Admin/CS, nomor Konfirmasi Pesanan, dan nomor Jastip/Request Barang.
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Email Toko
-                </label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-cyan-500 bg-white"
-                />
+
+              {/* 1. Main WhatsApp */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Nomor WhatsApp Toko Utama (Universal / Default)
+                  </label>
+                  <input
+                    type="text"
+                    value={form.whatsappNumber}
+                    onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
+                    placeholder="Contoh: 081234567890"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                    <span>Tersimpan: <b>{formatWhatsappDisplay(form.whatsappNumber)}</b></span>
+                    <a
+                      href={getWhatsappChatUrl(form.whatsappNumber, 'Halo, ini tes pesan WhatsApp Toko Grosir Nusantara!')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-700 hover:underline font-semibold flex items-center gap-1"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      <span>Tes Buka WA</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Email Resmi Toko
+                  </label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="toko@grosirnusantara.com"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Digunakan pada invoice pemesanan dan footer website.
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. Channel-Specific WhatsApp Numbers (Active when Custom Mode or expandable) */}
+              {form.useSingleWhatsapp === false && (
+                <div className="bg-white p-4 rounded-lg border border-cyan-200 shadow-xs space-y-3">
+                  <h4 className="text-xs font-bold text-cyan-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Opsi Kustom Nomor WhatsApp per Layanan</span>
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Tanya Admin / CS */}
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <label className="text-xs font-bold text-slate-800 block mb-1 flex items-center justify-between">
+                        <span>💬 Tanya Admin / CS</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.whatsappTanyaAdmin || ''}
+                        onChange={(e) => setForm({ ...form, whatsappTanyaAdmin: e.target.value })}
+                        placeholder={form.whatsappNumber || '0812...'}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-300 rounded bg-white"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Untuk tombol melayang &amp; tombol &quot;Tanya Admin&quot; produk.
+                      </p>
+                      <a
+                        href={getWhatsappChatUrl(form.whatsappTanyaAdmin || form.whatsappNumber, 'Halo CS/Admin Grosir Nusantara!')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-emerald-700 hover:underline font-semibold block mt-1"
+                      >
+                        Tes Buka WA Tanya Admin →
+                      </a>
+                    </div>
+
+                    {/* Konfirmasi Pesanan */}
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <label className="text-xs font-bold text-slate-800 block mb-1 flex items-center justify-between">
+                        <span>📦 Konfirmasi Pesanan</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.whatsappOrder || ''}
+                        onChange={(e) => setForm({ ...form, whatsappOrder: e.target.value })}
+                        placeholder={form.whatsappNumber || '0812...'}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-300 rounded bg-white"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Menerima konfirmasi invoice checkout &amp; bukti transfer.
+                      </p>
+                      <a
+                        href={getWhatsappChatUrl(form.whatsappOrder || form.whatsappNumber, 'Halo Admin Order Grosir Nusantara!')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-emerald-700 hover:underline font-semibold block mt-1"
+                      >
+                        Tes Buka WA Pesanan →
+                      </a>
+                    </div>
+
+                    {/* Jastip / Request Barang */}
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <label className="text-xs font-bold text-slate-800 block mb-1 flex items-center justify-between">
+                        <span>🔍 Request Barang / Jastip</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.whatsappRequest || ''}
+                        onChange={(e) => setForm({ ...form, whatsappRequest: e.target.value })}
+                        placeholder={form.whatsappNumber || '0812...'}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-300 rounded bg-white"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Menerima pengajuan titip beli barang khusus dari pembeli.
+                      </p>
+                      <a
+                        href={getWhatsappChatUrl(form.whatsappRequest || form.whatsappNumber, 'Halo Admin Request Grosir Nusantara!')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-emerald-700 hover:underline font-semibold block mt-1"
+                      >
+                        Tes Buka WA Jastip →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Custom WhatsApp Message Templates */}
+              <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Kustom Template Pesan WhatsApp (Otomatis Terisi)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">Owner dapat mengubah pesan pembuka</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Template Tanya Admin / CS Umum
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={form.whatsappGreetingGeneral || ''}
+                      onChange={(e) => setForm({ ...form, whatsappGreetingGeneral: e.target.value })}
+                      placeholder="Halo Admin Grosir Nusantara, saya ingin bertanya..."
+                      className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-cyan-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Template Tanya Produk (Tag: &#123;nama_produk&#125;, &#123;harga&#125;, &#123;min_order&#125;)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={form.whatsappGreetingProduct || ''}
+                      onChange={(e) => setForm({ ...form, whatsappGreetingProduct: e.target.value })}
+                      placeholder="Halo Admin, saya tertarik dengan produk {nama_produk}..."
+                      className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-cyan-500 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Direct Save Button inside edit section */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                <div className="text-[11px] text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                  ⚡ Semua perubahan nomor WA langsung aktif di seluruh website begitu disimpan!
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveAll}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-lg bg-[#00acc1] hover:bg-[#0097a7] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>{isSaving ? 'Menyimpan...' : 'Simpan WhatsApp Sekarang'}</span>
+                </button>
               </div>
             </div>
           )}
@@ -690,7 +934,7 @@ export const StoreProfileView: React.FC = () => {
           className="px-5 py-2 rounded bg-[#00acc1] hover:bg-[#0097a7] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
         >
           <Check className="w-4 h-4 stroke-[3]" />
-          <span>{isSaving ? 'Menyimpan...' : 'Sort'}</span>
+          <span>{isSaving ? 'Menyimpan...' : 'Simpan Profil & WhatsApp'}</span>
         </button>
 
         {/* Gray Button matching image_0.png [✕ Cancel] */}

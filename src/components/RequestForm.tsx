@@ -18,9 +18,10 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/initialData';
+import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
 
 export const RequestForm: React.FC = () => {
-  const { user, showToast, setCurrentView, activeOutlet, activeOutletInfo } = useApp();
+  const { user, showToast, setCurrentView, activeOutlet, activeOutletInfo, storeSettings } = useApp();
 
   const [activeTab, setActiveTab] = useState<'form' | 'tracking'>('form');
 
@@ -145,8 +146,11 @@ export const RequestForm: React.FC = () => {
   };
 
   const generateWhatsAppUrl = (ticket: ProductRequest) => {
-    const text = `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}), saya sudah membuat Request Barang dengan No. Tiket: *${ticket.ticketNumber}*.\n\nNama: ${ticket.customerName}\nBarang: *${ticket.itemName}*\nJumlah: ${ticket.quantity}\nTarget Budget: ${ticket.targetBudget}\n\nMohon bantuannya untuk dicarikan di sentra ${activeOutletInfo.name}. Terima kasih!`;
-    return `https://wa.me/62${BUSINESS_INFO.whatsapp.replace(/^0/, '')}?text=${encodeURIComponent(text)}`;
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'request', activeOutletInfo.whatsappNumber);
+    const greeting = storeSettings?.whatsappGreetingRequest ||
+      `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}), saya sudah membuat Request Barang dengan No. Tiket: *${ticket.ticketNumber}*.`;
+    const text = `${greeting}\n\nNama: ${ticket.customerName}\nBarang: *${ticket.itemName}*\nJumlah: ${ticket.quantity}\nTarget Budget: ${ticket.targetBudget}\n\nMohon bantuannya untuk dicarikan di sentra ${activeOutletInfo.name}. Terima kasih!`;
+    return getWhatsappChatUrl(effectiveWa, text);
   };
 
   return (

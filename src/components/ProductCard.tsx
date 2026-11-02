@@ -2,7 +2,7 @@ import React from 'react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
 import { ShoppingBag, Eye, MessageCircle, Tag } from 'lucide-react';
-import { BUSINESS_INFO } from '../data/initialData';
+import { getWhatsappChatUrl, getEffectiveWhatsapp, formatProductInquiryMessage } from '../utils/whatsapp';
 
 interface ProductCardProps {
   product: Product;
@@ -10,7 +10,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail }) => {
-  const { addToCart, isAdmin, setQuickPriceEditProduct, activeOutletInfo } = useApp();
+  const { addToCart, isAdmin, setQuickPriceEditProduct, activeOutletInfo, storeSettings } = useApp();
 
   const formatRupiah = (num: number) => {
     return 'Rp ' + num.toLocaleString('id-ID');
@@ -18,9 +18,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
 
   const handleWhatsAppAsk = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const wa = (activeOutletInfo.whatsappNumber || '081298765432').replace(/^0/, '');
-    const message = `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}), saya mau tanya ketersediaan stok & harga grosir produk: *${product.name}* (Min Order ${product.minOrder} ${product.unit}). Apakah ready di sentra ${activeOutletInfo.shortName}?`;
-    const url = `https://wa.me/62${wa}?text=${encodeURIComponent(message)}`;
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'tanya_admin', activeOutletInfo.whatsappNumber);
+    const message = formatProductInquiryMessage(storeSettings, product);
+    const url = getWhatsappChatUrl(effectiveWa, message);
     window.open(url, '_blank');
   };
 

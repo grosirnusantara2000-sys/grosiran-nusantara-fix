@@ -1,10 +1,12 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { BUSINESS_INFO } from '../data/initialData';
+import { formatWhatsappDisplay } from '../utils/whatsapp';
 import { Store, ShieldCheck, MapPin, Truck, CheckCircle2, MessageCircle } from 'lucide-react';
 
 export const AboutSection: React.FC = () => {
-  const { setCurrentView, activeOutletInfo } = useApp();
+  const { setCurrentView, activeOutletInfo, storeSettings } = useApp();
+  const effectiveWa = storeSettings?.whatsappNumber?.trim() || activeOutletInfo.whatsappNumber || BUSINESS_INFO.whatsapp;
 
   return (
     <section className="py-16 bg-white min-h-[85vh]">
@@ -94,7 +96,7 @@ export const AboutSection: React.FC = () => {
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Alamat Operasional</h3>
               <p className="text-slate-600 leading-relaxed">
-                {BUSINESS_INFO.address}
+                {storeSettings?.address || BUSINESS_INFO.address}
               </p>
             </div>
 
@@ -104,7 +106,7 @@ export const AboutSection: React.FC = () => {
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Jadwal Hari Pasar</h3>
               <p className="text-slate-600 leading-relaxed">
-                {BUSINESS_INFO.marketDays}
+                {storeSettings?.marketDays || BUSINESS_INFO.marketDays}
               </p>
               <p className="text-slate-500 text-[11px] mt-1">
                 (Toko tetap melayani belanja setiap hari kerja)
@@ -117,10 +119,10 @@ export const AboutSection: React.FC = () => {
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Layanan CS Online</h3>
               <p className="text-slate-600 leading-relaxed">
-                WhatsApp: <strong>{BUSINESS_INFO.whatsappDisplay}</strong>
+                WhatsApp: <strong>{formatWhatsappDisplay(effectiveWa)}</strong>
               </p>
               <p className="text-slate-500 text-[11px] mt-1">
-                {BUSINESS_INFO.serviceDays}
+                {storeSettings?.operationalHours || BUSINESS_INFO.serviceDays}
               </p>
             </div>
           </div>

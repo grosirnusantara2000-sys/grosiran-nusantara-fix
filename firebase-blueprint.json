@@ -250,6 +250,10 @@
       "schema": "StoreSettings",
       "description": "Store operational profiles and integration settings"
     },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Store activity logs and audit trail"
+    },
     "/notifications/{notifId}": {
       "schema": "AppNotification",
       "description": "Admin notifications collection"

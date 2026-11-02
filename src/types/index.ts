@@ -218,7 +218,19 @@ export interface StoreSettings {
   id: string;
   storeName: string;
   tagline: string;
-  whatsappNumber: string;
+  whatsappNumber: string; // Nomor Utama Toko
+  // Multi-Channel WhatsApp Customization (Tanya Admin, Order, Request)
+  whatsappTanyaAdmin?: string; // Nomor Khusus Tanya Admin / CS
+  whatsappOrder?: string; // Nomor Khusus Konfirmasi Pesanan & Struk
+  whatsappRequest?: string; // Nomor Khusus Request Barang / Jastip
+  useSingleWhatsapp?: boolean; // Default true: 1 nomor untuk semua, false: pisah per fungsi
+  
+  // Custom WhatsApp Message Templates
+  whatsappGreetingGeneral?: string;
+  whatsappGreetingProduct?: string;
+  whatsappGreetingOrder?: string;
+  whatsappGreetingRequest?: string;
+
   email: string;
   address: string;
   marketDays: string;

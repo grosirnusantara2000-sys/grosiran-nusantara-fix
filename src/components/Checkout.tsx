@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { createOrder } from '../services/dataService';
-import { COURIER_OPTIONS, BANK_ACCOUNTS, BUSINESS_INFO } from '../data/initialData';
+import { BUSINESS_INFO, COURIER_OPTIONS, BANK_ACCOUNTS } from '../data/initialData';
+import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
 import { Order, OrderItem } from '../types';
 import {
   Truck,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const Checkout: React.FC = () => {
-  const { cart, cartSubtotal, cartJokiTotal, clearCart, showToast, setCurrentView, setSelectedInvoiceId, user } = useApp();
+  const { cart, cartSubtotal, cartJokiTotal, clearCart, showToast, setCurrentView, setSelectedInvoiceId, user, storeSettings, activeOutletInfo } = useApp();
 
   // Customer Contact
   const [recipientName, setRecipientName] = useState(user?.displayName || '');
@@ -110,8 +111,11 @@ export const Checkout: React.FC = () => {
   };
 
   const getWhatsAppConfirmationUrl = (order: Order) => {
-    const text = `Halo Admin Grosir Nusantara, saya sudah checkout pesanan grosir:\n*No. Invoice: ${order.invoiceNumber}*\n\nNama: ${order.customerName}\nKota Tujuan: ${order.shippingAddress.city}, ${order.shippingAddress.province}\nTotal Pembayaran: ${formatRupiah(order.totalAmount)}\nMetode Pembayaran: ${order.paymentMethod}\nEkspedisi: ${order.courier}\n\nMohon dicek dan dibantu proses pembelian barangnya. Terima kasih!`;
-    return `https://wa.me/62${BUSINESS_INFO.whatsapp.replace(/^0/, '')}?text=${encodeURIComponent(text)}`;
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'order', activeOutletInfo.whatsappNumber);
+    const greeting = storeSettings?.whatsappGreetingOrder?.replace(/{nomor_invoice}/g, order.invoiceNumber) ||
+      `Halo Admin Grosir Nusantara, saya sudah checkout pesanan grosir:\n*No. Invoice: ${order.invoiceNumber}*`;
+    const text = `${greeting}\n\nNama: ${order.customerName}\nKota Tujuan: ${order.shippingAddress.city}, ${order.shippingAddress.province}\nTotal Pembayaran: ${formatRupiah(order.totalAmount)}\nMetode Pembayaran: ${order.paymentMethod}\nEkspedisi: ${order.courier}\n\nMohon dicek dan dibantu proses pembelian barangnya. Terima kasih!`;
+    return getWhatsappChatUrl(effectiveWa, text);
   };
 
   // If order was just placed, display Order Success & Invoice confirmation screen

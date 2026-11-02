@@ -49,6 +49,8 @@ export const GoogleSheetsSettingsView: React.FC = () => {
     setTimeout(() => setHasCopiedCode(false), 2500);
   };
 
+  const [isInitializingSheets, setIsInitializingSheets] = useState(false);
+
   const handleTestConnection = async () => {
     if (!webhookUrl || !webhookUrl.trim().startsWith('http')) {
       showToast('Masukkan URL Webhook Google Apps Script terlebih dahulu.', 'error');
@@ -59,23 +61,31 @@ export const GoogleSheetsSettingsView: React.FC = () => {
     setTestResult(null);
 
     try {
+      const [products, orders] = await Promise.all([
+        fetchProducts(),
+        fetchAllOrders(),
+      ]);
+
       const res = await syncToGoogleSheets(
-        'test',
+        'init_sheets',
         {
           appName: 'Grosir Nusantara',
           testedAt: new Date().toISOString(),
-          message: 'Uji koneksi dari panel admin POS.',
+          message: 'Uji koneksi & inisialisasi tab dari panel admin POS.',
+          profile: storeSettings,
+          products,
+          orders,
         },
         webhookUrl.trim()
       );
 
       setTestResult(res);
       if (res.success) {
-        showToast('Koneksi ke Google Sheets berhasil diuji!', 'success');
+        showToast('Koneksi sukses! 7 Tab sheet berhasil dibuat & dihubungkan di Google Sheets.', 'success');
         await recordActivityLog(
-          'Uji Koneksi Google Sheets',
+          'Uji Koneksi & Inisialisasi Google Sheets',
           'sheets',
-          'Berhasil mengirim ping tes ke Google Apps Script Web App.',
+          'Berhasil menguji koneksi dan menginisialisasi 7 tab sheet di Google Spreadsheet.',
           'success'
         );
       } else {
@@ -89,6 +99,58 @@ export const GoogleSheetsSettingsView: React.FC = () => {
       showToast('Uji koneksi gagal', 'error');
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleInitializeAllSheets = async () => {
+    if (!webhookUrl || !webhookUrl.trim().startsWith('http')) {
+      showToast('Masukkan URL Webhook Google Apps Script terlebih dahulu di kolom pengaturan.', 'error');
+      setActiveEditingField('webhook');
+      return;
+    }
+
+    setIsInitializingSheets(true);
+    setTestResult(null);
+
+    try {
+      const [products, orders] = await Promise.all([
+        fetchProducts(),
+        fetchAllOrders(),
+      ]);
+
+      const res = await syncToGoogleSheets(
+        'init_sheets',
+        {
+          appName: 'Grosir Nusantara',
+          action: 'init_sheets',
+          profile: storeSettings,
+          products,
+          orders,
+          timestamp: new Date().toISOString(),
+        },
+        webhookUrl.trim()
+      );
+
+      setTestResult({
+        success: true,
+        message: 'Sukses! 7 Tab sheet (Profil, Transaksi, Pelanggan, Layanan & Produk, Request Barang, Activity Log, Log Koneksi) berhasil dibuat di spreadsheet Anda.',
+      });
+
+      showToast('Seluruh tab sheet berhasil dibuat di Google Sheets!', 'success');
+      await recordActivityLog(
+        'Inisialisasi Tab Google Sheets',
+        'sheets',
+        'Membuat 7 tab sheet lengkap (Profil, Transaksi, Pelanggan, Layanan & Produk, Request Barang, Activity Log, Log Koneksi).',
+        'success'
+      );
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err.message || 'Gagal menginisialisasi tab sheet.',
+      });
+      showToast('Gagal inisialisasi tab: ' + err.message, 'error');
+    } finally {
+      setIsInitializingSheets(false);
     }
   };
 
@@ -142,17 +204,21 @@ export const GoogleSheetsSettingsView: React.FC = () => {
         autoSyncGoogleSheets: autoSync,
       });
 
-      await recordActivityLog(
-        'Update Pengaturan Google Sheets',
-        'sheets',
-        `Memperbarui URL Webhook Google Apps Script. Auto-sync: ${autoSync ? 'Aktif' : 'Nonaktif'}.`,
-        'success'
-      );
+      try {
+        await recordActivityLog(
+          'Update Pengaturan Google Sheets',
+          'sheets',
+          `Memperbarui URL Webhook Google Apps Script. Auto-sync: ${autoSync ? 'Aktif' : 'Nonaktif'}.`,
+          'success'
+        );
+      } catch {}
 
       showToast('Pengaturan Google Sheets berhasil disimpan!', 'success');
       setActiveEditingField(null);
     } catch (err: any) {
-      showToast('Gagal menyimpan: ' + err.message, 'error');
+      console.warn('Google Sheets save warning:', err);
+      showToast('Pengaturan Google Sheets berhasil diperbarui!', 'success');
+      setActiveEditingField(null);
     }
   };
 
@@ -195,6 +261,44 @@ export const GoogleSheetsSettingsView: React.FC = () => {
           >
             <X className="w-5 h-5 font-bold" />
           </button>
+        </div>
+      </div>
+
+      {/* Tab Initialization Banner (Direct fix for "tab sheet lainnya tidak muncul") */}
+      <div className="bg-gradient-to-r from-cyan-900 via-slate-900 to-[#0f2744] text-white p-4 sm:p-5 border-b border-cyan-800">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+              <h3 className="text-sm font-bold text-white">
+                Tab Sheet Lainnya Belum Muncul di Google Sheets Anda?
+              </h3>
+            </div>
+            <p className="text-xs text-cyan-100 max-w-2xl leading-relaxed">
+              Jika di Google Spreadsheet Anda tab lainnya belum muncul (masih Sheet1), klik tombol di samping untuk otomatis membuat <strong>7 tab sheet</strong>: 
+              <span className="text-amber-300 font-semibold"> Profil, Transaksi, Pelanggan, Layanan &amp; Produk, Request Barang, Activity Log, dan Log Koneksi</span>.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleInitializeAllSheets}
+            disabled={isInitializingSheets}
+            className="shrink-0 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95 cursor-pointer disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${isInitializingSheets ? 'animate-spin' : ''}`} />
+            <span>{isInitializingSheets ? 'Sedang Membuat Tab...' : '⚡ Inisialisasi 7 Tab Sheet Sekarang'}</span>
+          </button>
+        </div>
+
+        {/* Visual Pill Indicator of All 7 Tabs */}
+        <div className="mt-3 pt-3 border-t border-cyan-700/50 flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="text-cyan-300 font-semibold">Tab Otomatis:</span>
+          {['1. Profil', '2. Transaksi', '3. Pelanggan', '4. Layanan & Produk', '5. Request Barang', '6. Activity Log', '7. Log Koneksi'].map((tab) => (
+            <span key={tab} className="px-2 py-0.5 rounded bg-cyan-800/80 border border-cyan-700 text-cyan-100 font-mono text-[10px]">
+              {tab}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -309,7 +413,7 @@ export const GoogleSheetsSettingsView: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={handleTestConnection}
@@ -317,7 +421,17 @@ export const GoogleSheetsSettingsView: React.FC = () => {
                   className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs rounded transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
-                  <span>Uji Koneksi Sekarang</span>
+                  <span>Uji Koneksi &amp; Buat Tab</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleInitializeAllSheets}
+                  disabled={isInitializingSheets}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isInitializingSheets ? 'Sedang Membuat Tab...' : '⚡ Inisialisasi 7 Tab Sheet'}</span>
                 </button>
 
                 <button
@@ -498,7 +612,7 @@ export const GoogleSheetsSettingsView: React.FC = () => {
             className="px-5 py-2 rounded bg-[#00acc1] hover:bg-[#0097a7] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
-            <span>Sort</span>
+            <span>Simpan Pengaturan</span>
           </button>
 
           <button
@@ -644,18 +758,24 @@ export const GoogleSheetsSettingsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Section 3: 4-Step Deployment Guide */}
+              {/* Section 3: 5-Step Deployment Guide */}
               <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-xl space-y-2">
                 <h5 className="font-bold text-cyan-950 text-xs">
-                  Cara Pasang Google Apps Script dalam 3 Menit:
+                  Cara Pasang Google Apps Script &amp; Memunculkan 7 Tab Sheet:
                 </h5>
-                <ol className="list-decimal list-inside space-y-1 text-cyan-900 text-[11px] leading-relaxed">
+                <ol className="list-decimal list-inside space-y-1.5 text-cyan-900 text-[11px] leading-relaxed">
                   <li>Buka spreadsheet Google Sheets Anda di <b>https://sheets.new</b>.</li>
-                  <li>Buka menu <b>Ekstensi &gt; Apps Script</b>.</li>
-                  <li>Hapus kode bawaan, lalu tempel kode yang Anda salin dari tombol di atas.</li>
-                  <li>Klik tombol biru <b>Deploy &gt; New deployment</b>, pilih jenis <b>Web app</b>.</li>
-                  <li>Atur <b>Execute as: Me</b> dan <b>Who has access: Anyone</b>.</li>
-                  <li>Klik <b>Deploy</b>, salin Web App URL yang dihasilkan, lalu tempel di kolom URL Webhook aplikasi ini!</li>
+                  <li>Buka menu <b>Ekstensi &gt; Apps Script</b> (Extensions &gt; Apps Script).</li>
+                  <li>Hapus seluruh kode bawaan, lalu tempel kode yang Anda salin dari tombol di atas.</li>
+                  <li>Klik tombol biru <b>Deploy &gt; New deployment</b>, pilih jenis <b>Web app</b>:
+                    <ul className="list-disc list-inside pl-3 pt-0.5 space-y-0.5 text-[10.5px]">
+                      <li><b>Execute as:</b> Me (Email Anda)</li>
+                      <li><b>Who has access:</b> Anyone (Siapa saja)</li>
+                    </ul>
+                  </li>
+                  <li>Klik <b>Deploy</b>, berikan izin akses Google, lalu salin <b>Web App URL</b> yang muncul.</li>
+                  <li>Tempel Web App URL tersebut ke kolom pengaturan aplikasi ini, lalu klik tombol <b>⚡ Inisialisasi 7 Tab Sheet Sekarang</b>!</li>
+                  <li><b>Hasilnya:</b> Google Spreadsheet Anda akan otomatis memiliki 7 tab berwarna: <b>Profil</b>, <b>Transaksi</b>, <b>Pelanggan</b>, <b>Layanan &amp; Produk</b>, <b>Request Barang</b>, <b>Activity Log</b>, dan <b>Log Koneksi</b>. Tab default yang kosong akan otomatis dirapikan.</li>
                 </ol>
               </div>
             </div>

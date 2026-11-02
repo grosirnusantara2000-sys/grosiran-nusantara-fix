@@ -215,7 +215,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateStoreSettings = async (newSettings: StoreSettings) => {
     setStoreSettings(newSettings);
     await apiSaveStoreSettings(newSettings);
-    showToast('Profil toko & pengaturan berhasil diperbarui!', 'success');
+    triggerRefresh();
+    showToast('Profil toko & nomor WhatsApp berhasil diperbarui untuk seluruh aplikasi!', 'success');
   };
 
   const markNotificationAsRead = async (id: string) => {
@@ -375,7 +376,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartJokiTotal = 0; // Jasa / upah joki ditiadakan saat pembayaran
   const cartTotal = cartSubtotal;
 
-  const activeOutletInfo: OutletInfo = OUTLETS_DATA[activeOutlet] || OUTLETS_DATA.TANAH_ABANG;
+  // Dynamically compute activeOutletInfo so its whatsappNumber ALWAYS reflects the storeSettings.whatsappNumber
+  const activeOutletInfo: OutletInfo = React.useMemo(() => {
+    const baseInfo = OUTLETS_DATA[activeOutlet] || OUTLETS_DATA.TANAH_ABANG;
+    return {
+      ...baseInfo,
+      whatsappNumber: storeSettings.whatsappNumber?.trim() || baseInfo.whatsappNumber,
+    };
+  }, [activeOutlet, storeSettings.whatsappNumber]);
 
   const setActiveOutlet = (outletId: OutletId) => {
     setActiveOutletState(outletId);
@@ -391,14 +399,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStoreSettings((prev) => ({
         ...prev,
         activeOutletId: outletId,
-        storeName: `Grosir Nusantara – ${info.shortName}`,
-        whatsappNumber: info.whatsappNumber,
-        email: info.email,
-        address: info.address,
-        marketDays: info.marketDays,
-        operationalHours: info.operationalHours,
-        tagline: info.tagline,
-        receiptHeader: `*** GROSIR NUSANTARA (${info.shortName.toUpperCase()}) ***\n${info.tagline}`,
+        storeName: prev.storeName || `Grosir Nusantara – ${info.shortName}`,
+        // Preserve user's custom WhatsApp number across outlet switches
+        whatsappNumber: prev.whatsappNumber?.trim() || info.whatsappNumber,
+        email: prev.email || info.email,
+        address: prev.address || info.address,
+        marketDays: prev.marketDays || info.marketDays,
+        operationalHours: prev.operationalHours || info.operationalHours,
+        tagline: prev.tagline || info.tagline,
+        receiptHeader: prev.receiptHeader || `*** GROSIR NUSANTARA (${info.shortName.toUpperCase()}) ***\n${info.tagline}`,
       }));
       showToast(`Outlet aktif: ${info.name}`, 'info');
     }

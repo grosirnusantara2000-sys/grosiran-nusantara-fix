@@ -1,13 +1,14 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { BUSINESS_INFO } from '../data/initialData';
+import { getCleanWhatsappNumber, formatWhatsappDisplay } from '../utils/whatsapp';
 import { MapPin, Phone, Mail, Clock, ShieldCheck, Heart } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const { setCurrentView, setSelectedCategorySlug, storeSettings } = useApp();
 
-  const activeWhatsapp = storeSettings?.whatsappNumber || BUSINESS_INFO.whatsapp;
-  const cleanWhatsapp = activeWhatsapp.replace(/^0/, '62').replace(/\D/g, '');
+  const activeWhatsapp = storeSettings?.whatsappNumber?.trim() || BUSINESS_INFO.whatsapp;
+  const cleanWhatsapp = getCleanWhatsappNumber(activeWhatsapp);
   const activeEmail = storeSettings?.email || BUSINESS_INFO.email;
   const activeAddress = storeSettings?.address || BUSINESS_INFO.address;
   const activeStoreName = storeSettings?.storeName || 'GROSIR NUSANTARA';
@@ -146,7 +147,7 @@ export const Footer: React.FC = () => {
                 className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-bold transition-colors"
               >
                 <Phone className="w-3.5 h-3.5" />
-                <span>WhatsApp: {activeWhatsapp}</span>
+                <span>WhatsApp: {formatWhatsappDisplay(activeWhatsapp)}</span>
               </a>
               <div className="text-[11px] text-slate-400 pt-1">
                 Email: {activeEmail}

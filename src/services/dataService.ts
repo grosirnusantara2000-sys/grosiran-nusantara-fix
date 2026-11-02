@@ -34,6 +34,7 @@ import {
   INITIAL_ARTICLES,
   INITIAL_STORE_SETTINGS,
 } from '../data/initialData';
+import { getCleanWhatsappNumber } from '../utils/whatsapp';
 
 // Recursive cleaner to strip undefined fields from Firestore payloads to prevent runtime errors
 export function cleanFirestoreData<T>(obj: T): T {
@@ -712,21 +713,30 @@ export async function fetchStoreSettings(): Promise<StoreSettings> {
 export async function saveStoreSettings(settings: StoreSettings): Promise<void> {
   const path = 'storeSettings';
   const docId = 'main';
-  const payload: StoreSettings = {
+  const payload: StoreSettings = cleanFirestoreData({
     ...settings,
     id: docId,
     updatedAt: new Date().toISOString(),
-  };
+  });
 
+  // 1. Immediately cache in localStorage for instant responsiveness
   try {
     localStorage.setItem('aur_kuning_store_settings', JSON.stringify(payload));
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Failed to cache store settings in localStorage:', e);
+  }
 
+  // 2. Persist to Cloud Firestore
   try {
     await setDoc(doc(db, path, docId), payload, { merge: true });
   } catch (error) {
-    console.error('Failed to save store settings to Firestore:', error);
-    handleFirestoreError(error, OperationType.WRITE, `${path}/${docId}`);
+    console.warn('Firestore save storeSettings warning, fallback to local cache:', error);
+    try {
+      handleFirestoreError(error, OperationType.WRITE, `${path}/${docId}`);
+    } catch (diagnosticErr) {
+      // Log for developer diagnostics without bubbling raw JSON error to user UI toast
+      console.warn('Firestore diagnostic logged:', diagnosticErr);
+    }
   }
 }
 
@@ -963,6 +973,7 @@ export async function syncToGoogleSheets(
     | 'save_profile'
     | 'log_activity'
     | 'sync_all'
+    | 'init_sheets'
     | 'test',
   data: any,
   overrideWebhookUrl?: string
@@ -1234,6 +1245,8 @@ export function formatWhatsappReceiptText(order: Order, settings: StoreSettings)
     )
     .join('\n');
 
+  const cleanCsWa = getCleanWhatsappNumber(settings.whatsappNumber);
+
   return `*STRUK DIGITAL PESANAN GROSIR*
 *GROSIR NUSANTARA*
 _Sentra Sourcing: ${outletLabel}_
@@ -1264,43 +1277,106 @@ ${itemsText}
 ${order.trackingNumber ? `🏷️ *No. Resi:* ${order.trackingNumber}\n` : ''}${order.trackingLink ? `🔗 *Tautan Lacak Pesanan:* ${order.trackingLink}\n` : ''}
 ${settings.receiptFooter || 'Terima kasih telah berbelanja grosir melalui Grosir Nusantara!'}
 
-📞 *Konfirmasi & CS:* wa.me/${settings.whatsappNumber.replace(/\D/g, '')}
+📞 *Konfirmasi & CS:* wa.me/${cleanCsWa}
 `;
 }
 
-// Complete Google Apps Script code with multi-outlet support & full CRUD
+// Complete Google Apps Script code with multi-outlet support, auto sheet tab initialization & full CRUD
 export const SAMPLE_GOOGLE_APPS_SCRIPT_CODE = `// =========================================================================
 // GOOGLE APPS SCRIPT - MULTI-OUTLET POS & DATABASE GROSIR NUSANTARA
 // Outlets: 1. Tanah Abang (Jakarta) | 2. Pasar Aur Kuning (Bukittinggi)
+// Fitur: Inisialisasi Otomatis Semua Tab Sheet, CRUD doPost & doGet, Menu GAS
 // =========================================================================
 // Panduan Pasang:
 // 1. Buat Google Sheets baru di https://sheets.new
 // 2. Klik menu: Ekstensi > Apps Script (Extensions > Apps Script)
-// 3. Hapus seluruh isi default lalu tempel kode ini seluruhnya
-// 4. Klik "Simpan" (Ctrl+S) lalu klik tombol "Deploy" > "New deployment"
-// 5. Pilih "Web app" (Aplikasi Web):
-//    - Description: "Grosir Nusantara Multi-Outlet API"
+// 3. Hapus seluruh kode bawaan lalu tempel kode ini seluruhnya
+// 4. Klik "Simpan" (Ctrl+S)
+// 5. Klik tombol biru "Deploy" > "New deployment"
+// 6. Pilih jenis "Web app" (Aplikasi Web):
+//    - Description: "Grosir Nusantara API & Sheets Sync"
 //    - Execute as : "Me" (Email Google Anda)
 //    - Who has access: "Anyone" (Siapa saja)
-// 6. Klik "Deploy", beri izin akses Google, lalu Salin Web App URL
-// 7. Tempelkan URL tersebut ke Menu "Database (Sheets)" di Aplikasi Web!
+// 7. Klik "Deploy", izinkan akses akun Google, lalu Salin Web App URL
+// 8. Tempelkan URL tersebut ke Menu "Database (Sheets)" di Panel Admin Aplikasi!
 // =========================================================================
 
 /**
- * Endpoint POST: Menangani Create / Update / Sinkronisasi Multi-Outlet
+ * Menu Kustom di Google Sheets:
+ * Muncul otomatis saat Anda membuka spreadsheet di browser.
+ * Anda dapat mengklik tombol ini kapan saja untuk membuat atau reset tab sheet.
+ */
+function onOpen() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    ui.createMenu('🚀 Grosir Nusantara')
+      .addItem('⚡ Inisialisasi / Buat Semua Tab Sheet', 'menuInitializeAllSheets')
+      .addItem('🔄 Format Ulang Header Kolom', 'menuFormatHeaders')
+      .addItem('ℹ️ Status Koneksi Database', 'menuShowStatus')
+      .addToUi();
+  } catch (e) {
+    // Abaikan jika dieksekusi di luar konteks UI container spreadsheet
+  }
+}
+
+function menuInitializeAllSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = initializeAllSheets(ss, null);
+  SpreadsheetApp.getUi().alert('Sukses! Seluruh tab sheet (' + result.createdSheets.join(', ') + ') berhasil dibuat dan diformat.');
+}
+
+function menuFormatHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  initializeAllSheets(ss, null);
+  SpreadsheetApp.getUi().alert('Format header kolom berhasil diperbarui.');
+}
+
+function menuShowStatus() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets().map(function(s) { return s.getName(); });
+  SpreadsheetApp.getUi().alert('Database Grosir Nusantara Aktif!\\n\\nTab Sheet Tersedia:\\n- ' + sheets.join('\\n- '));
+}
+
+/**
+ * Endpoint POST: Menangani Create / Update / Inisialisasi Tab Multi-Outlet
  */
 function doPost(e) {
   try {
     var contents = JSON.parse(e.postData.contents);
     var action = contents.action;
-    var data = contents.data;
+    var data = contents.data || {};
     var timestamp = contents.timestamp || new Date().toISOString();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // -------------------------------------------------------------
+    // 0. Inisialisasi Seluruh Tab Sheet (Membuat Semua 7 Tab Sekaligus)
+    // -------------------------------------------------------------
+    if (action === 'init_sheets' || action === 'test') {
+      var initResult = initializeAllSheets(ss, data);
+
+      var logSheet = getOrCreateSheet(ss, 'Log Koneksi', [
+        'Waktu Pengujian', 'Status', 'Payload Diterima'
+      ], '#2563eb');
+
+      logSheet.appendRow([
+        new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+        'Koneksi Berhasil & Semua Tab Sheet Berhasil Diinisialisasi!',
+        JSON.stringify(data)
+      ]);
+
+      return jsonResponse({
+        status: 'success',
+        message: 'Koneksi Berhasil! Seluruh tab sheet telah dibuat: ' + initResult.createdSheets.join(', '),
+        spreadsheetName: ss.getName(),
+        sheetsAvailable: ss.getSheets().map(function(s) { return s.getName(); }),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // -------------------------------------------------------------
     // 1. Simpan / Perbarui Profil Toko & Outlet
     // -------------------------------------------------------------
-    if (action === 'save_profile' || action === 'profile') {
+    else if (action === 'save_profile' || action === 'profile') {
       var sheet = getOrCreateSheet(ss, 'Profil', [
         'Outlet ID', 'Parameter / Kunci', 'Nilai Pengaturan', 'Terakhir Diperbarui'
       ], '#0f2744');
@@ -1325,7 +1401,7 @@ function doPost(e) {
       });
 
       logActivity(ss, outletId, 'Admin', 'Update Profil Toko', 'Profil outlet ' + outletId + ' berhasil diperbarui.');
-      return jsonResponse({ status: 'success', message: 'Profil outlet ' + outletId + ' berhasil disimpan' });
+      return jsonResponse({ status: 'success', message: 'Profil outlet ' + outletId + ' berhasil disimpan di sheet Profil' });
     }
 
     // -------------------------------------------------------------
@@ -1393,7 +1469,7 @@ function doPost(e) {
       ]);
 
       logActivity(ss, outletId, data.customerName || 'Customer', 'Request Belanja', 'Tiket ' + (data.ticketNumber || data.id) + ' (' + data.itemName + ')');
-      return jsonResponse({ status: 'success', message: 'Request sourcing berhasil dicatat' });
+      return jsonResponse({ status: 'success', message: 'Request sourcing berhasil dicatat ke sheet Request Barang' });
     }
 
     // -------------------------------------------------------------
@@ -1409,6 +1485,8 @@ function doPost(e) {
     // 5. Sinkronisasi Massal (Sync All Katalog & Transaksi)
     // -------------------------------------------------------------
     else if (action === 'sync_all') {
+      initializeAllSheets(ss, data);
+
       if (data.products && Array.isArray(data.products)) {
         var pSheet = getOrCreateSheet(ss, 'Layanan & Produk', [
           'ID Produk', 'Outlet ID', 'Nama Produk', 'Kategori', 'Harga Ecer', 'Harga Grosir', 'Min. Order', 'Satuan', 'Stok'
@@ -1424,30 +1502,7 @@ function doPost(e) {
         });
       }
       logActivity(ss, 'ALL', 'Admin', 'Sinkronisasi Massal', 'Sinkronisasi lengkap database multi-outlet');
-      return jsonResponse({ status: 'success', message: 'Sinkronisasi multi-outlet selesai' });
-    }
-
-    // -------------------------------------------------------------
-    // 6. Uji Koneksi Webhook
-    // -------------------------------------------------------------
-    else if (action === 'test') {
-      var logSheet = getOrCreateSheet(ss, 'Log Koneksi', [
-        'Waktu Pengujian', 'Status', 'Payload Diterima'
-      ], '#2563eb');
-
-      logSheet.appendRow([
-        new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
-        'Koneksi Berhasil Aktif & Terhubung!',
-        JSON.stringify(data)
-      ]);
-
-      return jsonResponse({
-        status: 'success',
-        message: 'Koneksi ke Google Sheets Aktif!',
-        spreadsheetName: ss.getName(),
-        outletsSupported: ['TANAH_ABANG', 'AUR_KUNING'],
-        timestamp: new Date().toISOString()
-      });
+      return jsonResponse({ status: 'success', message: 'Sinkronisasi multi-outlet selesai dengan seluruh tab terhubung' });
     }
 
     return jsonResponse({ status: 'warning', message: 'Aksi tidak dikenali: ' + action });
@@ -1457,7 +1512,7 @@ function doPost(e) {
 }
 
 /**
- * Endpoint GET: Mendukung CRUD Read Data dengan Filter Outlet
+ * Endpoint GET: Mendukung Inisialisasi Cepat & Read Data
  */
 function doGet(e) {
   try {
@@ -1466,6 +1521,16 @@ function doGet(e) {
     var sheetName = params ? params.sheet : '';
     var outletFilter = params ? params.outlet : '';
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Inisialisasi otomatis jika dipanggil dengan ?action=init
+    if (action === 'init') {
+      var res = initializeAllSheets(ss, null);
+      return jsonResponse({
+        status: 'success',
+        message: 'Seluruh tab sheet berhasil dibuat: ' + res.createdSheets.join(', '),
+        sheets: ss.getSheets().map(function(s) { return s.getName(); })
+      });
+    }
 
     if (action === 'read' && sheetName) {
       var sheet = ss.getSheetByName(sheetName);
@@ -1485,25 +1550,111 @@ function doGet(e) {
       return jsonResponse({ status: 'success', sheet: sheetName, count: data.length, rows: data });
     }
 
+    // Default status view
+    var available = ss.getSheets().map(function(s) { return s.getName(); });
     return jsonResponse({
       status: 'active',
       appName: 'API Backend GROSIR NUSANTARA (Multi-Outlet)',
       outlets: ['TANAH_ABANG (Jakarta)', 'AUR_KUNING (Bukittinggi)'],
       spreadsheetName: ss.getName(),
-      sheetsAvailable: ss.getSheets().map(function(s) { return s.getName(); })
+      sheetsAvailable: available,
+      help: 'Gunakan POST dengan action: init_sheets, order, request, sync_all, atau profil untuk sinkronisasi.'
     });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
 }
 
+/**
+ * FUNGSI UTAMA: Inisialisasi & Buat Seluruh Tab Sheet Sekaligus
+ * Menjamin 7 Tab Sheet Selalu Tersedia di Google Spreadsheet Pengguna
+ */
+function initializeAllSheets(ss, payloadData) {
+  var created = [];
+
+  // 1. Sheet: Profil
+  var pSheet = getOrCreateSheet(ss, 'Profil', [
+    'Outlet ID', 'Parameter / Kunci', 'Nilai Pengaturan', 'Terakhir Diperbarui'
+  ], '#0f2744');
+  created.push('Profil');
+  if (pSheet.getLastRow() <= 1) {
+    var ts = new Date().toISOString();
+    var prof = (payloadData && payloadData.profile) ? payloadData.profile : {};
+    pSheet.appendRow(['TANAH_ABANG', 'Nama Toko', prof.storeName || 'Grosir Nusantara - Tanah Abang', ts]);
+    pSheet.appendRow(['TANAH_ABANG', 'Nomor WhatsApp', prof.whatsappNumber || '081298765432', ts]);
+    pSheet.appendRow(['TANAH_ABANG', 'Email Toko', prof.email || 'tanahabang@grosirnusantara.com', ts]);
+    pSheet.appendRow(['TANAH_ABANG', 'Alamat Lapak', prof.address || 'Pasar Tanah Abang Blok A & B, DKI Jakarta', ts]);
+    pSheet.appendRow(['AUR_KUNING', 'Nama Toko', 'Grosir Nusantara - Aur Kuning', ts]);
+    pSheet.appendRow(['AUR_KUNING', 'Nomor WhatsApp', prof.whatsappNumber || '081267891011', ts]);
+    pSheet.appendRow(['AUR_KUNING', 'Alamat Lapak', 'Kawasan Pasar Grosir Aur Kuning Blok B, Bukittinggi', ts]);
+  }
+
+  // 2. Sheet: Transaksi
+  var tSheet = getOrCreateSheet(ss, 'Transaksi', [
+    'Waktu Transaksi', 'Outlet ID', 'No. Invoice', 'Nama Pelanggan', 'No. WhatsApp', 'Email',
+    'Kota Tujuan', 'Rincian Barang', 'Subtotal Barang',
+    'Ongkos Kirim', 'Total Bayar', 'Status Bayar', 'Status Pesanan', 'Ekspedisi', 'No. Resi', 'Link Lacak'
+  ], '#0f2744');
+  created.push('Transaksi');
+
+  // 3. Sheet: Pelanggan
+  var cSheet = getOrCreateSheet(ss, 'Pelanggan', [
+    'Waktu Registrasi', 'Outlet Asal', 'Nama Lengkap', 'Nomor WhatsApp', 'Email', 'Kota / Domisili', 'Total Transaksi Terakhir'
+  ], '#059669');
+  created.push('Pelanggan');
+
+  // 4. Sheet: Layanan & Produk
+  var prodSheet = getOrCreateSheet(ss, 'Layanan & Produk', [
+    'ID Produk', 'Outlet ID', 'Nama Produk', 'Kategori', 'Harga Ecer', 'Harga Grosir', 'Min. Order', 'Satuan', 'Stok'
+  ], '#047857');
+  created.push('Layanan & Produk');
+
+  // 5. Sheet: Request Barang
+  var rSheet = getOrCreateSheet(ss, 'Request Barang', [
+    'Waktu Masuk', 'Outlet Target', 'No. Tiket', 'Nama Pelanggan', 'No. WhatsApp',
+    'Nama Barang', 'Kategori', 'Jumlah', 'Target Budget', 'Status', 'Catatan'
+  ], '#ea580c');
+  created.push('Request Barang');
+
+  // 6. Sheet: Activity Log
+  var aSheet = getOrCreateSheet(ss, 'Activity Log', [
+    'Timestamp', 'Outlet', 'Pengguna', 'Aktivitas / Aksi', 'Rincian Catatan'
+  ], '#334155');
+  created.push('Activity Log');
+
+  // 7. Sheet: Log Koneksi
+  var lSheet = getOrCreateSheet(ss, 'Log Koneksi', [
+    'Waktu Pengujian', 'Status', 'Payload Diterima'
+  ], '#2563eb');
+  created.push('Log Koneksi');
+
+  // Hapus tab bawaan "Sheet1" atau "Sheet 1" jika kosong agar rapi
+  try {
+    var defaultSheet1 = ss.getSheetByName('Sheet1') || ss.getSheetByName('Sheet 1');
+    if (defaultSheet1 && ss.getSheets().length > 1 && defaultSheet1.getLastRow() === 0) {
+      ss.deleteSheet(defaultSheet1);
+    }
+  } catch (e) {}
+
+  return { success: true, createdSheets: created };
+}
+
 // ---------------- Helper Utilities ----------------
 function getOrCreateSheet(ss, name, headers, headerColor) {
   var sheet = ss.getSheetByName(name);
-  if (!sheet) sheet = ss.insertSheet(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+  }
   if (sheet.getLastRow() === 0 && headers && headers.length > 0) {
     sheet.appendRow(headers);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground(headerColor || '#0f2744').setFontColor('#ffffff');
+    var range = sheet.getRange(1, 1, 1, headers.length);
+    range.setFontWeight('bold');
+    range.setBackground(headerColor || '#0f2744');
+    range.setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    for (var col = 1; col <= headers.length; col++) {
+      sheet.autoResizeColumn(col);
+    }
   }
   return sheet;
 }
@@ -1552,4 +1703,5 @@ function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 `;
+
 

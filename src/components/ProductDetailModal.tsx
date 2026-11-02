@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
 import { X, ShoppingBag, MessageCircle, ShieldCheck, Truck, Store, Plus, Minus, ArrowRight, Tag, Edit } from 'lucide-react';
-import { BUSINESS_INFO } from '../data/initialData';
+import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -12,7 +12,7 @@ interface ProductDetailModalProps {
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product, onClose }) => {
   if (!product) return null;
 
-  const { addToCart, setIsCartOpen, setCurrentView, isAdmin, setQuickPriceEditProduct, setEditingProductModal, activeOutletInfo } = useApp();
+  const { addToCart, setIsCartOpen, setCurrentView, isAdmin, setQuickPriceEditProduct, setEditingProductModal, activeOutletInfo, storeSettings } = useApp();
   const [quantity, setQuantity] = useState(product.minOrder);
   const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '');
@@ -37,9 +37,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   };
 
   const handleWhatsAppChat = () => {
-    const wa = (activeOutletInfo.whatsappNumber || '081298765432').replace(/^0/, '');
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'tanya_admin', activeOutletInfo.whatsappNumber);
     const text = `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}), saya tertarik order produk:\n*${product.name}*\nJumlah: ${quantity} ${product.unit}\nWarna: ${selectedColor || '-'}\nUkuran: ${selectedSize || '-'}\nTotal: ${formatRupiah(grandTotal)}\nMohon info ketersediaan di sentra ${activeOutletInfo.name}. Terima kasih!`;
-    const url = `https://wa.me/62${wa}?text=${encodeURIComponent(text)}`;
+    const url = getWhatsappChatUrl(effectiveWa, text);
     window.open(url, '_blank');
   };
 
