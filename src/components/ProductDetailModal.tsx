@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
-import { X, ShoppingBag, MessageCircle, ShieldCheck, Truck, Store, Plus, Minus, ArrowRight, Tag, Edit } from 'lucide-react';
+import { X, ShoppingBag, MessageCircle, ShieldCheck, Truck, Store, Plus, Minus, ArrowRight, Tag, Edit, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
+import { getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -16,6 +17,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   const [quantity, setQuantity] = useState(product.minOrder);
   const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '');
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Normalize all available images for this product
+  const allImages = React.useMemo(() => {
+    const list: string[] = [];
+    if (product.images && product.images.length > 0) {
+      list.push(...product.images);
+    } else if (product.imageUrl) {
+      list.push(product.imageUrl);
+    }
+    if (product.galleryUrls && product.galleryUrls.length > 0) {
+      product.galleryUrls.forEach((url) => {
+        if (!list.includes(url)) list.push(url);
+      });
+    }
+    return list.length > 0 ? list : [DEFAULT_PRODUCT_IMAGE];
+  }, [product]);
+
+  const activeImage = allImages[activeImageIndex] || allImages[0] || DEFAULT_PRODUCT_IMAGE;
 
   const formatRupiah = (num: number) => 'Rp ' + num.toLocaleString('id-ID');
 
@@ -55,17 +75,85 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
           <X className="w-5 h-5" />
         </button>
 
-        {/* Left Column: Image */}
-        <div className="md:w-1/2 bg-slate-50 relative flex items-center justify-center p-6 border-b md:border-b-0 md:border-r border-slate-200">
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="w-full h-auto max-h-[360px] md:max-h-[500px] object-cover rounded-xl shadow-xs"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-xs p-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center gap-2">
+        {/* Left Column: Multi-Image Gallery */}
+        <div className="md:w-1/2 bg-slate-50 relative flex flex-col justify-between p-5 border-b md:border-b-0 md:border-r border-slate-200">
+          {/* Main Featured Photo */}
+          <div className="relative w-full aspect-4/3 sm:aspect-square max-h-[360px] md:max-h-[420px] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shadow-xs">
+            <img
+              src={getSafeImageUrl(activeImage)}
+              alt={`${product.name} - Foto ${activeImageIndex + 1}`}
+              className="w-full h-full object-cover object-center"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== DEFAULT_PRODUCT_IMAGE) {
+                  target.src = DEFAULT_PRODUCT_IMAGE;
+                }
+              }}
+            />
+
+            {/* Gallery Navigation Arrows */}
+            {allImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1))}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                  title="Foto Sebelumnya"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 hover:bg-black/75 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                  title="Foto Selanjutnya"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                  {activeImageIndex + 1} / {allImages.length}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Multiple Image Thumbnails Strip */}
+          {allImages.length > 1 && (
+            <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+              {allImages.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                    activeImageIndex === idx
+                      ? 'border-amber-500 ring-2 ring-amber-400/30 scale-102'
+                      : 'border-slate-200 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={getSafeImageUrl(imgUrl)}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                    }}
+                  />
+                  {idx === 0 && (
+                    <span className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-[8px] text-center font-bold text-amber-300 py-0.2">
+                      Utama
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sourcing Badge */}
+          <div className="mt-3 bg-white/95 backdrop-blur-xs p-2 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center gap-2">
             <Store className="w-4 h-4 text-orange-600 shrink-0" />
-            <span>Belanja tangan pertama langsung di {activeOutletInfo.name}</span>
+            <span className="truncate">Tangan pertama langsung di {activeOutletInfo.name}</span>
           </div>
         </div>
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/initialData';
 import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
+import { compressMultipleImageFiles } from '../utils/imageUtils';
 
 export const RequestForm: React.FC = () => {
   const { user, showToast, setCurrentView, activeOutlet, activeOutletInfo, storeSettings } = useApp();
@@ -44,8 +45,8 @@ export const RequestForm: React.FC = () => {
   const [isSearchingTracking, setIsSearchingTracking] = useState(false);
   const [trackingNotFound, setTrackingNotFound] = useState(false);
 
-  // Photo Upload Handler (converts to base64 Data URL so it saves safely without external upload server)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo Upload Handler (compresses & converts to base64 Data URL so it saves safely without external upload server)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -54,19 +55,14 @@ export const RequestForm: React.FC = () => {
       return;
     }
 
-    Array.from(files).forEach((file) => {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast(`File ${file.name} melebihi batas 2MB`, 'error');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setPhotoUrls((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      showToast('Memproses dan mengompresi foto...', 'info');
+      const compressed = await compressMultipleImageFiles(files);
+      setPhotoUrls((prev) => [...prev, ...compressed]);
+      showToast(`${compressed.length} foto berhasil ditambahkan!`, 'success');
+    } catch (err: any) {
+      showToast('Gagal memproses foto: ' + (err.message || 'File tidak didukung'), 'error');
+    }
   };
 
   const removePhoto = (index: number) => {

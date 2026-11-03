@@ -62,7 +62,9 @@ import { GoogleSheetsSettingsView } from './GoogleSheetsSettingsView';
 import { ActivityLogView } from './ActivityLogView';
 import { BackupRestoreView } from './BackupRestoreView';
 import { ThermalReceiptModal } from './ThermalReceiptModal';
+import { AdminCustomizationView } from './AdminCustomizationView';
 import { formatWhatsappReceiptText } from '../services/dataService';
+import { compressMultipleImageFiles, getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -81,6 +83,7 @@ export const AdminDashboard: React.FC = () => {
   // Selected Active Menu Item
   const [activeMenu, setActiveMenu] = useState<
     | 'store_profile'
+    | 'custom_settings'
     | 'database_sheets'
     | 'activity_log'
     | 'backup_restore'
@@ -417,6 +420,22 @@ export const AdminDashboard: React.FC = () => {
                   </button>
                 )}
 
+                {/* 1b. Pengaturan Toko & Custom Data (PIN, Ekspedisi, Pembayaran, Panduan) */}
+                {matchesSearch('Pengaturan & Custom Data') && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMenu('custom_settings')}
+                    className={`w-full px-4 py-2.5 flex items-center gap-3 transition-colors text-left cursor-pointer ${
+                      activeMenu === 'custom_settings'
+                        ? 'bg-[#1e2530] text-amber-400 font-bold border-l-3 border-amber-400'
+                        : 'hover:bg-[#343e4c] text-slate-300'
+                    }`}
+                  >
+                    <Sliders className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>Pengaturan Toko &amp; Custom</span>
+                  </button>
+                )}
+
                 {/* 2. Database (Sheets) (NEW requested by user) */}
                 {matchesSearch('Database Sheets') && (
                   <button
@@ -725,6 +744,9 @@ export const AdminDashboard: React.FC = () => {
           
           {/* VIEW 1: PROFIL TOKO (Side Widget Style) */}
           {activeMenu === 'store_profile' && <StoreProfileView />}
+
+          {/* VIEW 1b: PENGATURAN & CUSTOM DATA (PIN, Ekspedisi, Pembayaran, Panduan) */}
+          {activeMenu === 'custom_settings' && <AdminCustomizationView />}
 
           {/* VIEW 2: DATABASE (SHEETS) & APPS SCRIPT (Side Widget Style) */}
           {activeMenu === 'database_sheets' && <GoogleSheetsSettingsView />}
@@ -1585,14 +1607,121 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">URL Foto Produk</label>
-                <input
-                  type="text"
-                  value={editingProduct.imageUrl}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })}
-                  placeholder="/assets/images/... atau https://..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
-                />
+                <label className="font-bold text-slate-700 block mb-1">
+                  Foto Produk (Bisa Upload Langsung / Banyak Foto)
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      id="admin-product-file-picker"
+                      accept="image/*"
+                      multiple
+                      onChange={async (e) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          showToast('Mengompresi foto produk...', 'info');
+                          try {
+                            const compressed = await compressMultipleImageFiles(files);
+                            const existing = editingProduct.images || (editingProduct.imageUrl ? [editingProduct.imageUrl] : []);
+                            const updatedImages = [...existing, ...compressed];
+                            setEditingProduct({
+                              ...editingProduct,
+                              images: updatedImages,
+                              imageUrl: updatedImages[0],
+                              galleryUrls: updatedImages.slice(1),
+                            });
+                            showToast(`${compressed.length} foto berhasil diunggah!`, 'success');
+                          } catch (err: any) {
+                            showToast('Gagal memproses gambar: ' + err.message, 'error');
+                          }
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="admin-product-file-picker"
+                      className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Upload Foto dari HP / Komputer
+                    </label>
+                  </div>
+
+                  {/* Thumbnail gallery preview */}
+                  {(editingProduct.images || editingProduct.imageUrl) && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {(editingProduct.images || [editingProduct.imageUrl]).map((img, idx) => (
+                        <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-slate-200 group bg-slate-100">
+                          <img
+                            src={getSafeImageUrl(img)}
+                            alt="Foto"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                            }}
+                          />
+                          {idx === 0 ? (
+                            <span className="absolute bottom-0 inset-x-0 bg-amber-500 text-[8px] text-slate-950 text-center font-bold">
+                              Utama
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentImgs = [...(editingProduct.images || [editingProduct.imageUrl])];
+                                const [sel] = currentImgs.splice(idx, 1);
+                                currentImgs.unshift(sel);
+                                setEditingProduct({
+                                  ...editingProduct,
+                                  images: currentImgs,
+                                  imageUrl: sel,
+                                  galleryUrls: currentImgs.slice(1),
+                                });
+                              }}
+                              className="absolute top-0 inset-x-0 bg-black/75 text-[7px] text-white text-center font-bold opacity-0 group-hover:opacity-100 cursor-pointer"
+                            >
+                              Jadikan Utama
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentImgs = (editingProduct.images || [editingProduct.imageUrl]).filter((_, i) => i !== idx);
+                              setEditingProduct({
+                                ...editingProduct,
+                                images: currentImgs,
+                                imageUrl: currentImgs[0] || '',
+                                galleryUrls: currentImgs.slice(1),
+                              });
+                            }}
+                            className="absolute top-0.5 right-0.5 p-0.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer"
+                            title="Hapus Foto"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    value={editingProduct.imageUrl}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const existing = editingProduct.images || [];
+                      const updated = existing.length > 0 ? [val, ...existing.slice(1)] : [val];
+                      setEditingProduct({
+                        ...editingProduct,
+                        imageUrl: val,
+                        images: updated,
+                      });
+                    }}
+                    placeholder="Atau tautan URL gambar..."
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-slate-50 font-mono text-[11px]"
+                  />
+                </div>
               </div>
 
               <div>

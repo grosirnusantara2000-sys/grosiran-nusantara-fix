@@ -22,7 +22,7 @@ interface CategoryGridProps {
 }
 
 export const CategoryGrid: React.FC<CategoryGridProps> = ({ categories, initialLimit = 3 }) => {
-  const { setSelectedCategorySlug, setCurrentView, activeOutletInfo } = useApp();
+  const { selectedCategorySlug, setSelectedCategorySlug, setCurrentView, activeOutletInfo } = useApp();
   const [showAll, setShowAll] = useState(false);
 
   const getIcon = (iconName: string) => {
@@ -51,7 +51,14 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ categories, initialL
   const handleSelectCategory = (slug: string) => {
     setSelectedCategorySlug(slug);
     setCurrentView('catalog');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      const el = document.getElementById('catalog-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 350, behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   const displayedCategories = showAll ? categories : categories.slice(0, initialLimit);
@@ -87,34 +94,48 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ categories, initialL
 
         {/* 3 Main Category Cards (Spacious & Clean Layout) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {displayedCategories.map((cat) => (
-            <div
-              key={cat.id}
-              onClick={() => handleSelectCategory(cat.slug)}
-              className="group p-5 bg-white hover:bg-slate-50/70 rounded-2xl border border-slate-200/90 hover:border-blue-900/40 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
-            >
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-center mb-4 shadow-2xs group-hover:scale-105 transition-transform">
-                  {getIcon(cat.iconName)}
+          {displayedCategories.map((cat) => {
+            const isSelected = selectedCategorySlug === cat.slug;
+            return (
+              <div
+                key={cat.id}
+                onClick={() => handleSelectCategory(cat.slug)}
+                className={`group p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-amber-50/40 border-amber-500 shadow-md ring-2 ring-amber-400/20'
+                    : 'bg-white hover:bg-slate-50/70 border-slate-200/90 hover:border-blue-900/40 hover:shadow-md'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                      {getIcon(cat.iconName)}
+                    </div>
+                    {isSelected && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-extrabold shadow-2xs">
+                        Aktif
+                      </span>
+                    )}
+                  </div>
+                  <h3 className={`text-base font-bold transition-colors ${isSelected ? 'text-amber-800' : 'text-slate-900 group-hover:text-blue-900'}`}>
+                    {cat.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">
+                    {cat.description}
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-900 transition-colors">
-                  {cat.name}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">
-                  {cat.description}
-                </p>
-              </div>
 
-              <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span className="font-mono-nums font-semibold text-slate-600">
-                  {cat.productCount || 30}+ Item
-                </span>
-                <span className="text-orange-600 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                  Pilih &rarr;
-                </span>
+                <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span className="font-mono-nums font-semibold text-slate-600">
+                    {cat.productCount || 30}+ Item
+                  </span>
+                  <span className={`font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 ${isSelected ? 'text-amber-600' : 'text-orange-600'}`}>
+                    {isSelected ? 'Terpilih ✓' : 'Pilih →'}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* "More" / "Lihat Kategori Lainnya" Clean Button Toggle */}

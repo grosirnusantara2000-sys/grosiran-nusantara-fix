@@ -32,17 +32,28 @@ export const Checkout: React.FC = () => {
   const [postalCode, setPostalCode] = useState('');
   const [shippingNotes, setShippingNotes] = useState('Mohon packing karung & lapis plastik anti air');
 
-  // Courier & Payment
-  const [selectedCourierId, setSelectedCourierId] = useState(COURIER_OPTIONS[0].id);
-  const [paymentMethod, setPaymentMethod] = useState('Transfer BCA');
+  // Dynamic Couriers & Payment Methods from StoreSettings
+  const activeCouriers = (storeSettings.courierOptions && storeSettings.courierOptions.length > 0)
+    ? storeSettings.courierOptions.filter((c) => c.active !== false)
+    : COURIER_OPTIONS;
+
+  const activeBankAccounts = (storeSettings.bankAccounts && storeSettings.bankAccounts.length > 0)
+    ? storeSettings.bankAccounts.filter((b) => b.active !== false)
+    : BANK_ACCOUNTS.map((b, i) => ({ id: 'bank-' + i, ...b, active: true }));
+
+  const [selectedCourierId, setSelectedCourierId] = useState(activeCouriers[0]?.id || 'indah-cargo');
+  const [paymentMethod, setPaymentMethod] = useState(activeBankAccounts[0]?.bankName || 'Transfer BCA');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
-  const selectedCourier = COURIER_OPTIONS.find((c) => c.id === selectedCourierId) || COURIER_OPTIONS[0];
+  const selectedCourier = activeCouriers.find((c) => c.id === selectedCourierId) || activeCouriers[0] || COURIER_OPTIONS[0];
 
   // Rough estimation: 1 order item package ~ 5kg minimum cargo
-  const totalWeightKg = Math.max(5, Math.ceil(cart.reduce((sum, item) => sum + item.quantity * 0.35, 0)));
-  const shippingCost = selectedCourier.ratePerKg * totalWeightKg;
+  const totalWeightKg = Math.max(
+    selectedCourier.minWeight || 5,
+    Math.ceil(cart.reduce((sum, item) => sum + item.quantity * 0.35, 0))
+  );
+  const shippingCost = (selectedCourier.ratePerKg || 6500) * totalWeightKg;
   const grandTotal = cartSubtotal + shippingCost;
 
   const formatRupiah = (num: number) => 'Rp ' + num.toLocaleString('id-ID');
@@ -359,7 +370,7 @@ export const Checkout: React.FC = () => {
               </div>
 
               <div className="space-y-2.5 text-xs">
-                {COURIER_OPTIONS.map((c) => (
+                {activeCouriers.map((c) => (
                   <label
                     key={c.id}
                     className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
@@ -379,7 +390,7 @@ export const Checkout: React.FC = () => {
                       <div>
                         <div className="font-bold text-slate-900">{c.name}</div>
                         <div className="text-[11px] text-slate-500">
-                          Estimasi sampai: {c.estimatedDays} · Min. {c.minWeight} kg
+                          Estimasi sampai: {c.estimatedDays} · Min. {c.minWeight} kg {c.type ? `(${c.type})` : ''}
                         </div>
                       </div>
                     </div>
@@ -395,28 +406,34 @@ export const Checkout: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
                 <span className="w-6 h-6 rounded-full bg-blue-900 text-white text-xs flex items-center justify-center">4</span>
-                <span>Metode Pembayaran</span>
+                <span>Metode Pembayaran (Transfer Bank &amp; E-Wallet)</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                {['Transfer BCA', 'Transfer Mandiri', 'Transfer BRI', 'Transfer Bank Nagari', 'QRIS Nasional'].map((m) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                {activeBankAccounts.map((b) => (
                   <label
-                    key={m}
-                    className={`p-3 rounded-xl border text-center cursor-pointer transition-all ${
-                      paymentMethod === m
-                        ? 'border-blue-900 bg-blue-50 text-blue-900 font-bold'
+                    key={b.id || b.bankName}
+                    className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                      paymentMethod === b.bankName
+                        ? 'border-blue-900 bg-blue-50 text-blue-900 font-bold ring-2 ring-blue-900/20'
                         : 'border-slate-200 text-slate-700 bg-white hover:border-slate-300'
                     }`}
                   >
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value={m}
-                      checked={paymentMethod === m}
+                      value={b.bankName}
+                      checked={paymentMethod === b.bankName}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                       className="sr-only"
                     />
-                    {m}
+                    <div>
+                      <div className="font-bold text-slate-900">{b.bankName}</div>
+                      <div className="font-mono text-[11px] text-slate-600 mt-0.5">{b.accountNumber}</div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-2">
+                      a.n. {b.accountHolder}
+                    </div>
                   </label>
                 ))}
               </div>

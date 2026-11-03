@@ -236,23 +236,44 @@ export async function submitProductRequest(requestData: Omit<ProductRequest, 'id
   const timestamp = Date.now();
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  const ticketNumber = `REQ-AK-${dateStr}-${randomSuffix}`;
+  const ticketNumber = `REQ-GN-${dateStr}-${randomSuffix}`;
   const requestId = `req_${timestamp}_${randomSuffix}`;
 
-  const newRequest: ProductRequest = {
+  const rawRequest: ProductRequest = {
     ...requestData,
     id: requestId,
     ticketNumber,
+    customerId: requestData.customerId || '',
+    customerName: requestData.customerName || 'Pelanggan Grosir',
+    customerWhatsapp: requestData.customerWhatsapp || '',
+    itemName: requestData.itemName || '',
+    category: requestData.category || 'Grosir Umum',
+    description: requestData.description || '',
+    quantity: requestData.quantity || '1 lusin',
+    targetBudget: requestData.targetBudget || 'Sesuai lapak',
+    notes: requestData.notes || '',
+    photoUrls: requestData.photoUrls || [],
     status: 'Request Diterima',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
+  const newRequest = cleanFirestoreData(rawRequest);
+
+  // Always cache locally so customer & admin can view even if network fluctuates
+  try {
+    const local = localStorage.getItem('nusantaragrosir_local_requests');
+    const list: ProductRequest[] = local ? JSON.parse(local) : [];
+    list.unshift(newRequest);
+    localStorage.setItem('nusantaragrosir_local_requests', JSON.stringify(list.slice(0, 50)));
+  } catch (e) {
+    console.warn('Local request cache error:', e);
+  }
+
   try {
     await setDoc(doc(db, path, requestId), newRequest);
   } catch (error) {
-    // If Firestore fails (e.g. offline or rule issue), report and return local model so user is never blocked
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.warn('Firestore setDoc request warning, cached locally:', error);
   }
 
   // Real-time admin notification
@@ -284,28 +305,58 @@ export async function fetchAllRequests(): Promise<ProductRequest[]> {
     snap.forEach((docItem) => {
       list.push(docItem.data() as ProductRequest);
     });
+
+    // Merge with any locally cached requests
+    try {
+      const local = localStorage.getItem('nusantaragrosir_local_requests');
+      if (local) {
+        const localList: ProductRequest[] = JSON.parse(local);
+        const existingIds = new Set(list.map((r) => r.id));
+        localList.forEach((lr) => {
+          if (!existingIds.has(lr.id)) list.push(lr);
+        });
+      }
+    } catch {}
+
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
-    console.error('Failed to fetch requests:', error);
+    console.error('Failed to fetch requests from firestore, loading local cache:', error);
+    try {
+      const local = localStorage.getItem('nusantaragrosir_local_requests');
+      if (local) return JSON.parse(local);
+    } catch {}
     return [];
   }
 }
 
 export async function fetchRequestByIdOrTicket(queryStr: string): Promise<ProductRequest | null> {
   const path = 'productRequests';
+  const cleanQ = queryStr.trim().toUpperCase();
   try {
     const snap = await getDocs(collection(db, path));
     for (const docItem of snap.docs) {
       const data = docItem.data() as ProductRequest;
-      if (data.id === queryStr || data.ticketNumber.toUpperCase() === queryStr.toUpperCase()) {
+      if (data.id === queryStr || data.ticketNumber?.toUpperCase() === cleanQ) {
         return data;
       }
     }
-    return null;
   } catch (error) {
-    console.error('Fetch request error:', error);
-    return null;
+    console.warn('Firestore fetch request error:', error);
   }
+
+  // Fallback to local cache
+  try {
+    const local = localStorage.getItem('nusantaragrosir_local_requests');
+    if (local) {
+      const list: ProductRequest[] = JSON.parse(local);
+      const found = list.find(
+        (r) => r.id === queryStr || r.ticketNumber?.toUpperCase() === cleanQ
+      );
+      if (found) return found;
+    }
+  } catch {}
+
+  return null;
 }
 
 // Update Request Status or Offer

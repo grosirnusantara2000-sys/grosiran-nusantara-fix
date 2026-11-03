@@ -604,13 +604,13 @@ export const INITIAL_FAQS: FAQItem[] = [
   },
 ];
 
-export const COURIER_OPTIONS = [
-  { id: 'indah-cargo', name: 'Indah Cargo Logistik (Pilihan Utama Grosir)', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 6500 },
-  { id: 'baraka-cargo', name: 'Baraka Sarana Tama Cargo', estimatedDays: '2-5 Hari', minWeight: 5, ratePerKg: 7000 },
-  { id: 'dakota-cargo', name: 'Dakota Cargo', estimatedDays: '3-6 Hari', minWeight: 10, ratePerKg: 6000 },
-  { id: 'jne-trucking', name: 'JNE Trucking (JTR)', estimatedDays: '3-5 Hari', minWeight: 10, ratePerKg: 8500 },
-  { id: 'jnt-cargo', name: 'J&T Cargo', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 8000 },
-  { id: 'pos-kargo', name: 'Pos Indonesia Kargo', estimatedDays: '3-6 Hari', minWeight: 3, ratePerKg: 9000 },
+export const COURIER_OPTIONS: import('../types').CourierOption[] = [
+  { id: 'indah-cargo', name: 'Indah Cargo Logistik (Pilihan Utama Grosir)', type: 'Kargo Darat/Laut', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 6500, active: true },
+  { id: 'baraka-cargo', name: 'Baraka Sarana Tama Cargo', type: 'Kargo Darat/Laut', estimatedDays: '2-5 Hari', minWeight: 5, ratePerKg: 7000, active: true },
+  { id: 'dakota-cargo', name: 'Dakota Cargo', type: 'Kargo Darat', estimatedDays: '3-6 Hari', minWeight: 10, ratePerKg: 6000, active: true },
+  { id: 'jne-trucking', name: 'JNE Trucking (JTR)', type: 'Kargo Darat', estimatedDays: '3-5 Hari', minWeight: 10, ratePerKg: 8500, active: true },
+  { id: 'jnt-cargo', name: 'J&T Cargo', type: 'Kargo Kilat', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 8000, active: true },
+  { id: 'pos-kargo', name: 'Pos Indonesia Kargo', type: 'Kargo Pos', estimatedDays: '3-6 Hari', minWeight: 3, ratePerKg: 9000, active: true },
 ];
 
 export const BANK_ACCOUNTS = [
@@ -701,6 +701,63 @@ export const INITIAL_STORE_SETTINGS: StoreSettings = {
   showFooterOnReceipt: true,
   thermalPaperWidth: '58mm',
   adminPin: '1234',
+
+  // Custom Expeditions / Cargo Partners
+  courierOptions: [
+    { id: 'indah-cargo', name: 'Indah Cargo Logistik (Pilihan Utama Grosir)', type: 'Kargo Darat/Laut', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 6500, active: true },
+    { id: 'baraka-cargo', name: 'Baraka Sarana Tama Cargo', type: 'Kargo Darat/Laut', estimatedDays: '2-5 Hari', minWeight: 5, ratePerKg: 7000, active: true },
+    { id: 'dakota-cargo', name: 'Dakota Cargo', type: 'Kargo Darat', estimatedDays: '3-6 Hari', minWeight: 10, ratePerKg: 6000, active: true },
+    { id: 'jne-trucking', name: 'JNE Trucking (JTR)', type: 'Kargo Darat', estimatedDays: '3-5 Hari', minWeight: 10, ratePerKg: 8500, active: true },
+    { id: 'jnt-cargo', name: 'J&T Cargo', type: 'Kargo Kilat', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 8000, active: true },
+    { id: 'pos-kargo', name: 'Pos Indonesia Kargo', type: 'Kargo Pos', estimatedDays: '3-6 Hari', minWeight: 3, ratePerKg: 9000, active: true },
+  ],
+
+  // Custom Payment Methods & Bank Accounts
+  bankAccounts: [
+    { id: 'bank-bca', bankName: 'Bank BCA', accountNumber: '032-198-4421', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'KCU Jakarta', active: true },
+    { id: 'bank-mandiri', bankName: 'Bank Mandiri', accountNumber: '111-00-2983741-2', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'KCP Tanah Abang', active: true },
+    { id: 'bank-bri', bankName: 'Bank BRI', accountNumber: '0058-01-089723-50-1', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'KCP Aur Kuning', active: true },
+    { id: 'bank-nagari', bankName: 'Bank Nagari (Sumbar)', accountNumber: '1001-0210-98234-1', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'Cabang Bukittinggi', active: true },
+    { id: 'qris-grosir', bankName: 'QRIS Nasional (Semua Bank / E-Wallet)', accountNumber: 'NMID: ID102003891823', accountHolder: 'GROSIR NUSANTARA', branch: 'Instant Scan', active: true },
+  ],
+
+  // Custom Guide Media / Cara Order Tutorials
+  orderGuides: [
+    {
+      id: 'guide-1',
+      title: 'Langkah 1: Pilih Produk atau Kirim Foto Request',
+      type: 'step',
+      stepNumber: 1,
+      description: 'Buka katalog Grosir Nusantara dan pilih produk grosir siap kirim, atau gunakan menu "Request Barang" jika mencari model/seri tertentu langsung dari lapak pasar.',
+      mediaUrl: '/assets/images/product_grosir_fashion_1793527996022.jpg',
+      active: true,
+    },
+    {
+      id: 'guide-2',
+      title: 'Langkah 2: Checkout & Pilih Ekspedisi Kargo Hemat',
+      type: 'step',
+      stepNumber: 2,
+      description: 'Tentukan alamat pengiriman Anda ke seluruh Indonesia. Pilih ekspedisi kargo rekanan grosir (Indah Cargo, Baraka, Dakota, JTR, dsb) untuk tarif partai besar termurah.',
+      mediaUrl: '/assets/images/about_aur_kuning_packing_1793527996506.jpg',
+      active: true,
+    },
+    {
+      id: 'guide-3',
+      title: 'Langkah 3: Pembayaran & Konfirmasi WhatsApp Otomatis',
+      type: 'step',
+      stepNumber: 3,
+      description: 'Lakukan pembayaran via Transfer Bank (BCA, Mandiri, BRI, Bank Nagari) atau QRIS. Tombol WhatsApp kami akan otomatis terhubung ke admin resmi untuk verifikasi nota.',
+      active: true,
+    },
+    {
+      id: 'guide-4',
+      title: 'Langkah 4: Foto Fisik Lapak, Packing Karung & Resi',
+      type: 'step',
+      stepNumber: 4,
+      description: 'Tim kami mendatangi lapak toko fisik, memotret nota asli, melakukan packing karung berisolasi anti air, dan mengirimkan nomor resi ekspedisi kargo.',
+      active: true,
+    },
+  ],
 };
 
 export const INITIAL_ACTIVITY_LOGS: import('../types').ActivityLog[] = [

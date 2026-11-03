@@ -54,6 +54,7 @@ export interface Product {
   retailPrice?: number; // Harga eceran
   jokiFee?: number; // Opsional backwards compatibility (0)
   imageUrl: string;
+  images?: string[]; // Multiple photos gallery
   galleryUrls?: string[];
   inStock: boolean;
   colors?: string[];
@@ -254,6 +255,46 @@ export interface StoreSettings {
   showFooterOnReceipt?: boolean;
   thermalPaperWidth?: '58mm' | '80mm';
   adminPin?: string;
+
+  // Custom Expeditions / Cargo Partners
+  courierOptions?: CourierOption[];
+
+  // Custom Payment Methods & Bank Accounts
+  bankAccounts?: BankAccount[];
+
+  // Custom Guide Media / Cara Order Tutorials
+  orderGuides?: OrderGuideItem[];
+}
+
+export interface CourierOption {
+  id: string;
+  name: string;
+  type: string;
+  ratePerKg: number;
+  minWeight: number;
+  estimatedDays: string;
+  notes?: string;
+  active?: boolean;
+}
+
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  branch?: string;
+  qrCodeUrl?: string;
+  active?: boolean;
+}
+
+export interface OrderGuideItem {
+  id: string;
+  title: string;
+  type: 'image' | 'video' | 'step';
+  mediaUrl?: string;
+  description?: string;
+  stepNumber?: number;
+  active?: boolean;
 }
 
 export interface ActivityLog {

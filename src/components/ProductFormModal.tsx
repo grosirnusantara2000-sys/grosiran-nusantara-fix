@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { saveProduct } from '../services/dataService';
 import { Product, Category } from '../types';
-import { X, Upload, Plus, Trash2, Image as ImageIcon, Save, Check, Sparkles } from 'lucide-react';
+import { X, Upload, Plus, Trash2, Image as ImageIcon, Save, Check, Sparkles, Star, Layers, Loader2 } from 'lucide-react';
+import { compressMultipleImageFiles, getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
 interface ProductFormModalProps {
   categories: Category[];
@@ -12,11 +13,11 @@ interface ProductFormModalProps {
 }
 
 const PRESET_AUR_KUNING_IMAGES = [
-  { label: 'Mukena Bordir', url: '/src/assets/images/product_mukena_bordir_1793527995244.jpg' },
-  { label: 'Pakaian & Kaos', url: '/src/assets/images/product_grosir_fashion_1793527996022.jpg' },
-  { label: 'Hijab & Voal', url: '/src/assets/images/product_hijab_segiempat_1793527997536.jpg' },
-  { label: 'Pasar Aur Kuning', url: '/src/assets/images/hero_pasar_aur_kuning_1793527995583.jpg' },
-  { label: 'Gudang & Kargo', url: '/src/assets/images/about_aur_kuning_packing_1793527996506.jpg' },
+  { label: 'Mukena Bordir', url: '/assets/images/product_mukena_bordir_1793527995244.jpg' },
+  { label: 'Pakaian & Kaos', url: '/assets/images/product_grosir_fashion_1793527996022.jpg' },
+  { label: 'Hijab & Voal', url: '/assets/images/product_hijab_segiempat_1793527997536.jpg' },
+  { label: 'Pasar Aur Kuning', url: '/assets/images/hero_pasar_aur_kuning_1793527995583.jpg' },
+  { label: 'Gudang & Kargo', url: '/assets/images/about_aur_kuning_packing_1793527996506.jpg' },
 ];
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -34,7 +35,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [retailPrice, setRetailPrice] = useState<number>(50000);
   const [minOrder, setMinOrder] = useState<number>(3);
   const [unit, setUnit] = useState('pcs');
-  const [imageUrl, setImageUrl] = useState('/src/assets/images/product_grosir_fashion_1793527996022.jpg');
+  const [imageUrl, setImageUrl] = useState('/assets/images/product_grosir_fashion_1793527996022.jpg');
+  const [images, setImages] = useState<string[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [inStock, setInStock] = useState(true);
   const [colors, setColors] = useState<string[]>(['Seri Warna']);
   const [newColorInput, setNewColorInput] = useState('');
@@ -54,7 +58,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setRetailPrice(productToEdit.price);
       setMinOrder(productToEdit.minOrder);
       setUnit(productToEdit.unit || 'pcs');
-      setImageUrl(productToEdit.imageUrl);
+      
+      const loadedImgs = productToEdit.images && productToEdit.images.length > 0
+        ? productToEdit.images
+        : productToEdit.imageUrl ? [productToEdit.imageUrl] : [];
+      setImages(loadedImgs);
+      setImageUrl(loadedImgs[0] || productToEdit.imageUrl);
+      
       setInStock(productToEdit.inStock);
       setColors(productToEdit.colors || []);
       setSizes(productToEdit.sizes || []);
@@ -71,6 +81,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setMinOrder(3);
       setUnit('pcs');
       setImageUrl(PRESET_AUR_KUNING_IMAGES[0].url);
+      setImages([PRESET_AUR_KUNING_IMAGES[0].url]);
       setInStock(true);
       setColors(['Seri 6 Warna']);
       setSizes(['All Size']);
@@ -82,23 +93,42 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('Ukuran foto maksimal 2MB', 'error');
-      return;
+  const handleMultipleFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setIsCompressing(true);
+    try {
+      showToast('Mengunggah & mengompresi foto produk...', 'info');
+      const compressed = await compressMultipleImageFiles(files);
+      setImages((prev) => {
+        const updated = [...prev, ...compressed];
+        if (updated.length > 0) setImageUrl(updated[0]);
+        return updated;
+      });
+      showToast(`${compressed.length} foto berhasil diunggah!`, 'success');
+    } catch (err: any) {
+      showToast('Gagal memproses foto: ' + (err.message || 'File tidak didukung'), 'error');
+    } finally {
+      setIsCompressing(false);
     }
+  };
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setImageUrl(event.target.result as string);
-        showToast('Foto berhasil dimuat!', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleSetPrimaryImage = (index: number) => {
+    setImages((prev) => {
+      const copy = [...prev];
+      const [chosen] = copy.splice(index, 1);
+      copy.unshift(chosen);
+      setImageUrl(chosen);
+      return copy;
+    });
+    showToast('Foto utama berhasil diganti!', 'success');
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages((prev) => {
+      const copy = prev.filter((_, i) => i !== index);
+      setImageUrl(copy[0] || '');
+      return copy;
+    });
   };
 
   const handleAddColor = () => {
@@ -144,7 +174,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         jokiFee: 0,
         minOrder: Number(minOrder),
         unit,
-        imageUrl,
+        imageUrl: images[0] || imageUrl || PRESET_AUR_KUNING_IMAGES[0].url,
+        images: images.length > 0 ? images : [imageUrl || PRESET_AUR_KUNING_IMAGES[0].url],
+        galleryUrls: images.slice(1),
         inStock,
         colors: colors.length > 0 ? colors : ['Seri Standar'],
         sizes: sizes.length > 0 ? sizes : ['All Size'],
@@ -294,59 +326,142 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* Image Upload & Presets */}
-          <div>
-            <label className="block font-bold text-slate-800 mb-1">
-              Foto Produk Lapak
-            </label>
-            <div className="flex gap-4 items-start">
-              <img
-                src={imageUrl}
-                alt="Preview"
-                className="w-20 h-20 object-cover rounded-xl border border-slate-200 bg-slate-100 shrink-0"
+          {/* Image Upload & Multiple Photos Gallery */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-slate-800 text-xs">
+                Galeri Foto Produk Lapak <span className="text-slate-400 font-normal">({images.length} foto)</span>
+              </label>
+              <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                Dapat unggah beberapa foto sekaligus
+              </span>
+            </div>
+
+            {/* Drag & Drop Upload Zone */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  handleMultipleFiles(e.dataTransfer.files);
+                }
+              }}
+              className={`border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                isDragging
+                  ? 'border-amber-500 bg-amber-50/50 scale-[1.01]'
+                  : 'border-slate-300 hover:border-blue-900 bg-slate-50/60'
+              }`}
+            >
+              <input
+                type="file"
+                id="product-photo-upload-multi"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) handleMultipleFiles(e.target.files);
+                }}
+                className="hidden"
               />
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    id="product-photo-upload"
-                    accept="image/*"
-                    onChange={handleImageFileChange}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="product-photo-upload"
-                    className="px-3 py-1.5 bg-blue-900 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-blue-800 flex items-center gap-1.5 transition-colors"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Pilih Foto dari Perangkat
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Atau masukkan URL gambar..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
-                />
+              <div className="flex flex-col items-center justify-center gap-1.5 py-1">
+                {isCompressing ? (
+                  <div className="flex items-center gap-2 text-blue-900 text-xs font-semibold py-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-900" />
+                    <span>Sedang mengompresi & memproses foto...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-150 flex items-center justify-center text-blue-900">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <label
+                      htmlFor="product-photo-upload-multi"
+                      className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-2xs inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Pilih Foto dari Perangkat (Bisa Banyak)
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      atau tarik &amp; lepas (drag and drop) foto produk langsung ke sini
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Quick Presets */}
-            <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-              <span className="text-[10px] text-slate-500">Gunakan preset pasar:</span>
+            {/* Uploaded Photos Gallery Preview with Primary Badge & Remove */}
+            {images.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold text-slate-600 block">
+                  Foto yang Terunggah: (Foto pertama adalah Foto Utama pada katalog)
+                </span>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                  {images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 group bg-slate-100 ${
+                        idx === 0 ? 'border-amber-500 ring-2 ring-amber-400/30' : 'border-slate-200'
+                      }`}
+                    >
+                      <img
+                        src={getSafeImageUrl(img)}
+                        alt={`Produk ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                        }}
+                      />
+
+                      {/* Primary Badge */}
+                      {idx === 0 ? (
+                        <div className="absolute top-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                          <Star className="w-2.5 h-2.5 fill-current" />
+                          <span>Utama</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetPrimaryImage(idx)}
+                          className="absolute top-1 left-1 bg-slate-900/80 hover:bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-xs"
+                          title="Jadikan Foto Utama"
+                        >
+                          Pilih Utama
+                        </button>
+                      )}
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-full opacity-80 group-hover:opacity-100 transition-opacity cursor-pointer shadow-xs"
+                        title="Hapus Foto Ini"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Presets fallback */}
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-1.5 items-center">
+              <span className="text-[10px] text-slate-500">Preset foto pasar:</span>
               {PRESET_AUR_KUNING_IMAGES.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
-                  onClick={() => setImageUrl(preset.url)}
-                  className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                    imageUrl === preset.url
-                      ? 'bg-blue-900 text-white border-blue-900 font-bold'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  onClick={() => {
+                    setImages((prev) => [...prev, preset.url]);
+                    if (!imageUrl) setImageUrl(preset.url);
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded border bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 cursor-pointer"
                 >
-                  {preset.label}
+                  + {preset.label}
                 </button>
               ))}
             </div>

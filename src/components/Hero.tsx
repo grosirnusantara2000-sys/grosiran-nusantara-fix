@@ -34,7 +34,7 @@ export const Hero: React.FC = () => {
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black tracking-tight text-white leading-tight mb-4">
-            NUSANTARA <span className="text-amber-400">GROSIR</span>
+            GROSIR <span className="text-amber-400">NUSANTARA</span>
           </h1>
 
           <p className="text-xl sm:text-2xl font-bold text-slate-200 mb-4 leading-snug">

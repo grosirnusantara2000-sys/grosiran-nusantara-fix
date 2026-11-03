@@ -3,9 +3,13 @@ import { useApp } from '../context/AppContext';
 import { ShoppingCart, SearchCheck, CheckSquare, PackageCheck, ArrowRight } from 'lucide-react';
 
 export const HowItWorks: React.FC = () => {
-  const { setCurrentView } = useApp();
+  const { setCurrentView, storeSettings } = useApp();
 
-  const steps = [
+  const activeGuides = (storeSettings.orderGuides && storeSettings.orderGuides.length > 0)
+    ? storeSettings.orderGuides.filter((g) => g.active !== false)
+    : null;
+
+  const defaultSteps = [
     {
       num: '01',
       title: 'Pilih / Request Barang',
@@ -47,38 +51,72 @@ export const HowItWorks: React.FC = () => {
           </p>
         </div>
 
-        {/* 4 Steps Row */}
+        {/* Steps Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.num}
-                className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs relative flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-2xl font-black font-mono-nums text-orange-600/30">
-                      {step.num}
-                    </span>
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-blue-900" />
+          {activeGuides
+            ? activeGuides.map((guide, idx) => (
+                <div
+                  key={guide.id}
+                  className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs relative flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-2xl font-black font-mono-nums text-orange-600/30">
+                        {String(guide.stepNumber || idx + 1).padStart(2, '0')}
+                      </span>
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center font-bold text-xs">
+                        P{guide.stepNumber || idx + 1}
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 mb-2">
+                      {guide.title}
+                    </h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {guide.description}
+                    </p>
+
+                    {guide.mediaUrl && (
+                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 aspect-16/9 bg-slate-100">
+                        <img src={guide.mediaUrl} alt={guide.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-[11px] font-semibold text-blue-900">
+                    <span>Grosir Nusantara Express Sourcing</span>
+                  </div>
+                </div>
+              ))
+            : defaultSteps.map((step) => {
+                const Icon = step.icon;
+                return (
+                  <div
+                    key={step.num}
+                    className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs relative flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-2xl font-black font-mono-nums text-orange-600/30">
+                          {step.num}
+                        </span>
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center">
+                          <Icon className="w-5 h-5 text-blue-900" />
+                        </div>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 mb-2">
+                        {step.title}
+                      </h3>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {step.desc}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-[11px] font-semibold text-blue-900">
+                      <span>Grosir Nusantara Express Sourcing</span>
                     </div>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {step.desc}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-[11px] font-semibold text-blue-900">
-                  <span>Grosir Nusantara Express Sourcing</span>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
         </div>
 
         <div className="mt-10 text-center">

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
-import { ShoppingBag, Eye, MessageCircle, Tag } from 'lucide-react';
+import { ShoppingBag, Eye, MessageCircle, Tag, Layers } from 'lucide-react';
 import { getWhatsappChatUrl, getEffectiveWhatsapp, formatProductInquiryMessage } from '../utils/whatsapp';
+import { getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -37,16 +38,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
       {/* Product Image (Lead with Imagery - 65% height of container) */}
       <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
         <img
-          src={product.imageUrl}
+          src={getSafeImageUrl(product.imageUrl || product.images?.[0])}
           alt={product.name}
           className="w-full h-full object-cover object-center group-hover:scale-104 transition-transform duration-300"
           loading="lazy"
           referrerPolicy="no-referrer"
           onError={(e) => {
-            // Stylized CSS fallback if image fails
-            (e.target as HTMLElement).style.display = 'none';
+            const target = e.currentTarget;
+            if (target.src !== DEFAULT_PRODUCT_IMAGE) {
+              target.src = DEFAULT_PRODUCT_IMAGE;
+            }
           }}
         />
+
+        {/* Gallery badge if product has multiple photos */}
+        {((product.images && product.images.length > 1) || (product.galleryUrls && product.galleryUrls.length > 1)) && (
+          <div className="absolute bottom-2.5 right-2.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+            <Layers className="w-3 h-3 text-amber-400" />
+            <span>{product.images?.length || product.galleryUrls?.length} Foto</span>
+          </div>
+        )}
 
         {/* Minimal Subtle Metadata */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
