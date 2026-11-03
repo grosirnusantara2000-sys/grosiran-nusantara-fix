@@ -1,4 +1,4 @@
-import { StoreSettings } from '../types';
+import { StoreSettings, Order, ProductRequest } from '../types';
 
 /**
  * Central WhatsApp utility for Grosir Nusantara
@@ -120,3 +120,75 @@ export function formatTanyaAdminMessage(
   }
   return base;
 }
+
+/**
+ * Constructs official Invoice Nota confirmation WhatsApp message
+ * Guarantees that the unique Invoice Number is prominently featured
+ * along with items, totals, destination, and self-tracking instructions.
+ */
+export function formatWhatsappOrderInvoiceMessage(
+  storeSettings: StoreSettings | undefined,
+  order: Order
+): string {
+  const formatRupiah = (num: number) => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+  const itemsList = order.items
+    ?.map(
+      (it, idx) =>
+        `${idx + 1}. ${it.productName} (${it.quantity} pcs${it.color ? ' - ' + it.color : ''}${it.size ? ' / ' + it.size : ''}) = ${formatRupiah((it.wholesalePrice || it.price) * it.quantity)}`
+    )
+    .join('\n') || '-';
+
+  return `*NOTA RESMI PESANAN GROSIR NUSANTARA*
+*NO. INVOICE:* \`${order.invoiceNumber}\`
+--------------------------------------------
+*Penerima:* ${order.customerName}
+*WhatsApp:* ${order.customerWhatsapp}
+*Alamat Tujuan:* ${order.shippingAddress?.street || ''}, ${order.shippingAddress?.city || ''}, ${order.shippingAddress?.province || ''}
+*Ekspedisi:* ${order.courier || '-'}
+*Metode Bayar:* ${order.paymentMethod || '-'}
+
+*RINCIAN BARANG:*
+${itemsList}
+
+*Subtotal Belanja:* ${formatRupiah(order.subtotal)}
+*Ongkir Kargo (${order.courier}):* ${formatRupiah(order.shippingCost)}
+*TOTAL TAGIHAN:* ${formatRupiah(order.totalAmount)}
+--------------------------------------------
+*Status Pesanan:* ${order.orderStatus}
+*Lacak Pesanan Mandiri:*
+Anda dapat mengecek progres belanja, foto lapak, & nomor resi secara mandiri di web Grosir Nusantara pada menu *Lacak Pesanan* dengan memasukkan No. Invoice: *${order.invoiceNumber}*
+
+Mohon dicek dan dibantu proses pembelian barangnya. Terima kasih!`;
+}
+
+/**
+ * Constructs official Request Barang Nota/Tiket WhatsApp message
+ * Guarantees that the unique Ticket/Nota Number is prominently featured
+ * along with target outlet, requested item, budget, and tracking instructions.
+ */
+export function formatWhatsappRequestNotaMessage(
+  storeSettings: StoreSettings | undefined,
+  request: ProductRequest,
+  outletName?: string
+): string {
+  return `*NOTA TIKET REQUEST BARANG GROSIR NUSANTARA*
+*NO. TIKET / NOTA:* \`${request.ticketNumber}\`
+--------------------------------------------
+*Sentra Sourcing:* ${outletName || 'Tanah Abang & Aur Kuning'}
+*Nama Pemesan:* ${request.customerName}
+*WhatsApp:* ${request.customerWhatsapp}
+*Kategori:* ${request.category || 'Grosir Umum'}
+
+*BARANG YANG DICARI:*
+*${request.itemName}*
+*Jumlah / Partai:* ${request.quantity || '1 lusin'}
+*Target Budget:* ${request.targetBudget || 'Harga tangan pertama lapak'}
+*Catatan Sourcing:* ${request.notes || '-'}
+--------------------------------------------
+*Status Request:* ${request.status}
+*Lacak Status Mandiri:*
+Pantau update pencarian lapak & konfirmasi harga langsung di web Grosir Nusantara pada menu *Lacak Pesanan* dengan memasukkan No. Tiket: *${request.ticketNumber}*
+
+Mohon bantuannya untuk dicarikan langsung di pasar grosir. Terima kasih!`;
+}
+

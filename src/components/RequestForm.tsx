@@ -16,13 +16,14 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   Sparkles,
+  Copy,
 } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/initialData';
-import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
+import { getWhatsappChatUrl, getEffectiveWhatsapp, formatWhatsappRequestNotaMessage } from '../utils/whatsapp';
 import { compressMultipleImageFiles } from '../utils/imageUtils';
 
 export const RequestForm: React.FC = () => {
-  const { user, showToast, setCurrentView, activeOutlet, activeOutletInfo, storeSettings } = useApp();
+  const { user, showToast, setCurrentView, setSelectedInvoiceId, activeOutlet, activeOutletInfo, storeSettings } = useApp();
 
   const [activeTab, setActiveTab] = useState<'form' | 'tracking'>('form');
 
@@ -141,12 +142,21 @@ export const RequestForm: React.FC = () => {
     }
   };
 
+  const [copiedTicket, setCopiedTicket] = useState(false);
+
+  const copyTicketToClipboard = (ticketNum: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(ticketNum);
+      setCopiedTicket(true);
+      showToast('Nomor Tiket / Nota Request berhasil disalin!', 'success');
+      setTimeout(() => setCopiedTicket(false), 2500);
+    }
+  };
+
   const generateWhatsAppUrl = (ticket: ProductRequest) => {
     const effectiveWa = getEffectiveWhatsapp(storeSettings, 'request', activeOutletInfo.whatsappNumber);
-    const greeting = storeSettings?.whatsappGreetingRequest ||
-      `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}), saya sudah membuat Request Barang dengan No. Tiket: *${ticket.ticketNumber}*.`;
-    const text = `${greeting}\n\nNama: ${ticket.customerName}\nBarang: *${ticket.itemName}*\nJumlah: ${ticket.quantity}\nTarget Budget: ${ticket.targetBudget}\n\nMohon bantuannya untuk dicarikan di sentra ${activeOutletInfo.name}. Terima kasih!`;
-    return getWhatsappChatUrl(effectiveWa, text);
+    const message = formatWhatsappRequestNotaMessage(storeSettings, ticket, activeOutletInfo.name);
+    return getWhatsappChatUrl(effectiveWa, message);
   };
 
   return (
@@ -413,11 +423,22 @@ export const RequestForm: React.FC = () => {
                 Request Berhasil Diterima!
               </span>
               <h3 className="text-xl font-extrabold text-slate-900 mt-1 mb-2">
-                Nomor Tiket Anda
+                Nomor Tiket / Nota Request Anda
               </h3>
 
-              <div className="p-3 bg-slate-100 rounded-xl font-mono-nums font-bold text-base sm:text-lg text-blue-900 tracking-wider mb-4 border border-slate-200">
-                {submittedTicket.ticketNumber}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className="p-3 bg-slate-100 rounded-xl font-mono-nums font-bold text-base sm:text-lg text-blue-900 tracking-wider border border-slate-200 flex items-center gap-2">
+                  <span>{submittedTicket.ticketNumber}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyTicketToClipboard(submittedTicket.ticketNumber)}
+                    className="p-1.5 hover:bg-slate-200 text-slate-600 rounded cursor-pointer transition-colors"
+                    title="Salin No. Tiket"
+                  >
+                    {copiedTicket ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                {copiedTicket && <span className="text-xs text-emerald-600 font-semibold">Tersalin!</span>}
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed mb-6">
@@ -432,17 +453,19 @@ export const RequestForm: React.FC = () => {
                   className="w-full py-3 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  Hubungi Admin via WhatsApp Sekarang
+                  Kirim Nota Request ke WhatsApp Admin
                 </a>
                 <button
                   onClick={() => {
+                    const ticket = submittedTicket.ticketNumber;
                     setSubmittedTicket(null);
-                    setTrackingQuery(submittedTicket.ticketNumber);
-                    setActiveTab('tracking');
+                    setSelectedInvoiceId(ticket);
+                    setCurrentView('orders');
                   }}
-                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Lihat Halaman Status Request
+                  <Clock className="w-4 h-4 text-blue-900" />
+                  <span>Lacak Status Request di Menu Lacak Pesanan</span>
                 </button>
               </div>
             </div>

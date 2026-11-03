@@ -75,10 +75,16 @@ export const AboutSection: React.FC = () => {
 
           <div className="relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 aspect-4/3 bg-slate-100">
             <img
-              src="/src/assets/images/about_aur_kuning_packing_1793527996506.jpg"
+              src="/assets/images/about_aur_kuning_packing_1793527996506.jpg"
               alt="Pengemasan kargo belanja grosir Grosir Nusantara"
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.includes('product_grosir_fashion')) {
+                  target.src = '/assets/images/product_grosir_fashion_1793527996022.jpg';
+                }
+              }}
             />
             <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-4 text-white text-xs">
               <div className="font-bold">Proses Pengecekan & Pengemasan Kargo</div>

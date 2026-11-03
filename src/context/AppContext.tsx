@@ -121,10 +121,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [adminSimulation, setAdminSimulation] = useState<boolean>(false);
 
-  // Dedicated Admin/Owner Login State (Default: false / Mode Tamu Pembeli)
+  // Dedicated Admin/Owner Login State (Default: strictly false / Mode Pembeli)
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('grosir_nusantara_admin_auth') === 'true';
+      return sessionStorage.getItem('grosir_nusantara_admin_auth') === 'true';
     } catch {
       return false;
     }
@@ -291,23 +291,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginAdmin = (inputPin: string) => {
-    const validPin = storeSettings.adminPin || '1234';
+    const validPin = storeSettings.adminPin?.trim() || '1234';
     const trimmed = inputPin.trim();
-    if (trimmed === validPin || trimmed === '1234' || trimmed === '9988' || trimmed === '0000') {
+    if (trimmed === validPin) {
       setIsAdminLoggedIn(true);
       try {
-        localStorage.setItem('grosir_nusantara_admin_auth', 'true');
+        sessionStorage.setItem('grosir_nusantara_admin_auth', 'true');
       } catch {}
       showToast('Login Admin / Owner Berhasil!', 'success');
       return { success: true, message: 'Berhasil masuk ke panel Admin/Owner' };
     }
-    return { success: false, message: 'PIN Admin tidak sesuai. Coba PIN default: 1234' };
+    return { success: false, message: 'PIN Admin tidak sesuai. Akses ditolak.' };
   };
 
   const logoutAdmin = () => {
     setIsAdminLoggedIn(false);
     setAdminSimulation(false);
     try {
+      sessionStorage.removeItem('grosir_nusantara_admin_auth');
       localStorage.removeItem('grosir_nusantara_admin_auth');
     } catch {}
     if (currentView === 'admin' || currentView === 'manage-products') {

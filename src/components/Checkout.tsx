@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { createOrder } from '../services/dataService';
 import { BUSINESS_INFO, COURIER_OPTIONS, BANK_ACCOUNTS } from '../data/initialData';
-import { getWhatsappChatUrl, getEffectiveWhatsapp } from '../utils/whatsapp';
+import { getWhatsappChatUrl, getEffectiveWhatsapp, formatWhatsappOrderInvoiceMessage } from '../utils/whatsapp';
 import { Order, OrderItem } from '../types';
 import {
   Truck,
@@ -13,6 +13,8 @@ import {
   ArrowRight,
   ShoppingBag,
   MessageCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export const Checkout: React.FC = () => {
@@ -45,6 +47,7 @@ export const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState(activeBankAccounts[0]?.bankName || 'Transfer BCA');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [copiedInvoice, setCopiedInvoice] = useState(false);
 
   const selectedCourier = activeCouriers.find((c) => c.id === selectedCourierId) || activeCouriers[0] || COURIER_OPTIONS[0];
 
@@ -123,10 +126,17 @@ export const Checkout: React.FC = () => {
 
   const getWhatsAppConfirmationUrl = (order: Order) => {
     const effectiveWa = getEffectiveWhatsapp(storeSettings, 'order', activeOutletInfo.whatsappNumber);
-    const greeting = storeSettings?.whatsappGreetingOrder?.replace(/{nomor_invoice}/g, order.invoiceNumber) ||
-      `Halo Admin Grosir Nusantara, saya sudah checkout pesanan grosir:\n*No. Invoice: ${order.invoiceNumber}*`;
-    const text = `${greeting}\n\nNama: ${order.customerName}\nKota Tujuan: ${order.shippingAddress.city}, ${order.shippingAddress.province}\nTotal Pembayaran: ${formatRupiah(order.totalAmount)}\nMetode Pembayaran: ${order.paymentMethod}\nEkspedisi: ${order.courier}\n\nMohon dicek dan dibantu proses pembelian barangnya. Terima kasih!`;
-    return getWhatsappChatUrl(effectiveWa, text);
+    const message = formatWhatsappOrderInvoiceMessage(storeSettings, order);
+    return getWhatsappChatUrl(effectiveWa, message);
+  };
+
+  const copyInvoiceToClipboard = (inv: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(inv);
+      setCopiedInvoice(true);
+      showToast('Nomor Invoice berhasil disalin ke clipboard!', 'success');
+      setTimeout(() => setCopiedInvoice(false), 2500);
+    }
   };
 
   // If order was just placed, display Order Success & Invoice confirmation screen
@@ -144,6 +154,22 @@ export const Checkout: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 mb-2">
             Invoice #{createdOrder.invoiceNumber}
           </h2>
+
+          {/* Copyable Invoice Number Pill */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="bg-slate-100 border border-slate-300 px-3.5 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-bold text-blue-900 flex items-center gap-2">
+              <span>{createdOrder.invoiceNumber}</span>
+              <button
+                type="button"
+                onClick={() => copyInvoiceToClipboard(createdOrder.invoiceNumber)}
+                className="p-1 hover:bg-slate-200 text-slate-600 rounded cursor-pointer transition-colors"
+                title="Salin Nomor Invoice"
+              >
+                {copiedInvoice ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {copiedInvoice && <span className="text-[11px] text-emerald-600 font-semibold">Tersalin!</span>}
+          </div>
 
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-left my-4 space-y-2 text-xs">
             <div className="flex justify-between">
@@ -183,16 +209,17 @@ export const Checkout: React.FC = () => {
               className="w-full py-3 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
             >
               <MessageCircle className="w-4 h-4" />
-              Konfirmasi & Kirim Bukti Transfer ke WhatsApp
+              Kirim Nota Invoice &amp; Bukti Transfer ke WhatsApp Admin
             </a>
             <button
               onClick={() => {
                 setSelectedInvoiceId(createdOrder.invoiceNumber);
-                setCurrentView('order-detail');
+                setCurrentView('orders');
               }}
-              className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
-              Lihat Rincian Invoice & Tracking
+              <Truck className="w-4 h-4 text-blue-900" />
+              <span>Lacak Status Pesanan Ini Sekarang</span>
             </button>
           </div>
         </div>

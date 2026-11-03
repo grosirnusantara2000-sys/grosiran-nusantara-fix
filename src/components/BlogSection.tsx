@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Article } from '../types';
 import { useApp } from '../context/AppContext';
 import { BookOpen, Calendar, Clock, ArrowRight, User, X } from 'lucide-react';
+import { getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
 interface BlogSectionProps {
   articles: Article[];
@@ -36,10 +37,16 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ articles }) => {
               <div>
                 <div className="aspect-16/9 w-full bg-slate-200 overflow-hidden">
                   <img
-                    src={art.coverImage}
+                    src={getSafeImageUrl(art.coverImage)}
                     alt={art.title}
                     className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('product_grosir_fashion')) {
+                        target.src = DEFAULT_PRODUCT_IMAGE;
+                      }
+                    }}
                   />
                 </div>
 
@@ -84,9 +91,15 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ articles }) => {
 
               <div className="aspect-16/9 w-full rounded-xl overflow-hidden mb-6 bg-slate-100">
                 <img
-                  src={selectedArticle.coverImage}
+                  src={getSafeImageUrl(selectedArticle.coverImage)}
                   alt={selectedArticle.title}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.src.includes('product_grosir_fashion')) {
+                      target.src = DEFAULT_PRODUCT_IMAGE;
+                    }
+                  }}
                 />
               </div>
 

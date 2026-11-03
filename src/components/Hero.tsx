@@ -10,7 +10,7 @@ export const Hero: React.FC = () => {
       {/* Background Image with Scrim */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/src/assets/images/hero_pasar_aur_kuning_1793527995583.jpg"
+          src="/assets/images/hero_pasar_aur_kuning_1793527995583.jpg"
           alt="Grosir Nusantara - Tanah Abang & Aur Kuning"
           className="w-full h-full object-cover object-center opacity-25 filter brightness-75 contrast-110"
           referrerPolicy="no-referrer"

@@ -35,6 +35,7 @@ import {
   INITIAL_STORE_SETTINGS,
 } from '../data/initialData';
 import { getCleanWhatsappNumber } from '../utils/whatsapp';
+import { getSafeImageUrl } from '../utils/imageUtils';
 
 // Recursive cleaner to strip undefined fields from Firestore payloads to prevent runtime errors
 export function cleanFirestoreData<T>(obj: T): T {
@@ -61,9 +62,15 @@ export async function fetchProducts(): Promise<Product[]> {
       const list: Product[] = [];
       snap.forEach((docItem) => {
         const item = docItem.data() as Product;
-        // Strictly normalize outletId
+        // Strictly normalize outletId & image URLs
         if (!item.outletId) {
           item.outletId = item.id.startsWith('prod-ta') ? 'TANAH_ABANG' : 'AUR_KUNING';
+        }
+        if (item.imageUrl) {
+          item.imageUrl = getSafeImageUrl(item.imageUrl);
+        }
+        if (item.images && Array.isArray(item.images)) {
+          item.images = item.images.map((img) => getSafeImageUrl(img));
         }
         list.push(item);
       });
@@ -222,7 +229,11 @@ export async function fetchArticles(): Promise<Article[]> {
     }
     const list: Article[] = [];
     snap.forEach((docItem) => {
-      list.push(docItem.data() as Article);
+      const art = docItem.data() as Article;
+      if (art.coverImage) {
+        art.coverImage = getSafeImageUrl(art.coverImage);
+      }
+      list.push(art);
     });
     return list;
   } catch (error) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { fetchOrderByIdOrInvoice, updateOrderDetails } from '../services/dataService';
-import { Order, OrderStatus } from '../types';
+import { fetchOrderByIdOrInvoice, updateOrderDetails, fetchRequestByIdOrTicket, updateRequestStatus } from '../services/dataService';
+import { Order, OrderStatus, ProductRequest, RequestStatus } from '../types';
 import {
   Search,
   CheckCircle2,
@@ -16,15 +16,22 @@ import {
   ExternalLink,
   Printer,
   ShieldCheck,
+  Copy,
+  Check,
+  MessageCircle,
+  Sparkles,
 } from 'lucide-react';
+import { getWhatsappChatUrl, getEffectiveWhatsapp, formatWhatsappRequestNotaMessage } from '../utils/whatsapp';
 
 export const OrderTrackingView: React.FC = () => {
-  const { selectedInvoiceId, setSelectedInvoiceId, showToast, user } = useApp();
+  const { selectedInvoiceId, setSelectedInvoiceId, showToast, user, storeSettings, activeOutletInfo } = useApp();
 
   const [searchInvoice, setSearchInvoice] = useState(selectedInvoiceId || '');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+  const [currentRequest, setCurrentRequest] = useState<ProductRequest | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [paymentProofInput, setPaymentProofInput] = useState('');
   const [isUploadingProof, setIsUploadingProof] = useState(false);
 
@@ -34,20 +41,52 @@ export const OrderTrackingView: React.FC = () => {
     }
   }, [selectedInvoiceId]);
 
-  const handleSearch = async (invNumber: string) => {
-    if (!invNumber.trim()) return;
+  const copyCode = (code?: string) => {
+    if (!code) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      showToast('Nomor berhasil disalin ke clipboard!', 'success');
+      setTimeout(() => setCopiedCode(false), 2500);
+    }
+  };
+
+  const handleSearch = async (queryNumber: string) => {
+    const clean = queryNumber.trim();
+    if (!clean) return;
     setIsLoading(true);
     setNotFound(false);
+    setCurrentOrder(null);
+    setCurrentRequest(null);
+
     try {
-      const order = await fetchOrderByIdOrInvoice(invNumber.trim());
+      const upper = clean.toUpperCase();
+      if (upper.startsWith('REQ')) {
+        // Prioritize request search
+        const req = await fetchRequestByIdOrTicket(clean);
+        if (req) {
+          setCurrentRequest(req);
+          return;
+        }
+      }
+
+      // Try order search
+      const order = await fetchOrderByIdOrInvoice(clean);
       if (order) {
         setCurrentOrder(order);
-      } else {
-        setCurrentOrder(null);
-        setNotFound(true);
+        return;
       }
+
+      // If not found as order, try request as well
+      const req = await fetchRequestByIdOrTicket(clean);
+      if (req) {
+        setCurrentRequest(req);
+        return;
+      }
+
+      setNotFound(true);
     } catch (err) {
-      showToast('Gagal memuat status pesanan', 'error');
+      showToast('Gagal memuat status: periksa koneksi', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -100,8 +139,33 @@ export const OrderTrackingView: React.FC = () => {
     'Selesai',
   ];
 
+  const REQUEST_STEPS: RequestStatus[] = [
+    'Request Diterima',
+    'Sedang Dicarikan',
+    'Barang Ditemukan',
+    'Menunggu Persetujuan Harga',
+    'Disetujui Customer',
+    'Selesai',
+  ];
+
   const getStepIndex = (status: OrderStatus) => {
     return ORDER_STEPS.indexOf(status);
+  };
+
+  const getRequestStepIndex = (status: RequestStatus) => {
+    return REQUEST_STEPS.indexOf(status);
+  };
+
+  const handleApproveOffer = async (reqId: string) => {
+    try {
+      await updateRequestStatus(reqId, 'Disetujui Customer');
+      if (currentRequest) {
+        setCurrentRequest({ ...currentRequest, status: 'Disetujui Customer' });
+      }
+      showToast('Penawaran disetujui! Tim kami akan segera membelikan barang di lapak.', 'success');
+    } catch (e) {
+      showToast('Gagal memproses persetujuan penawaran', 'error');
+    }
   };
 
   return (
@@ -132,10 +196,10 @@ export const OrderTrackingView: React.FC = () => {
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Masukkan Nomor Invoice (contoh: INV-AK-20261101-1234)..."
+                placeholder="Ketik Nomor Invoice atau No. Tiket Request (contoh: INV-... atau REQ-...)..."
                 value={searchInvoice}
                 onChange={(e) => setSearchInvoice(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 font-mono-nums text-slate-900"
+                className="w-full pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 font-mono text-slate-900"
               />
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             </div>
@@ -144,7 +208,7 @@ export const OrderTrackingView: React.FC = () => {
               disabled={isLoading}
               className="px-6 py-2.5 text-xs font-bold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
             >
-              {isLoading ? 'Mencari...' : 'Lacak Invoice'}
+              {isLoading ? 'Mencari...' : 'Lacak Status'}
             </button>
           </form>
 
@@ -152,7 +216,7 @@ export const OrderTrackingView: React.FC = () => {
             <div className="mt-3 p-3 bg-red-50 text-red-900 rounded-lg border border-red-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>
-                Nomor invoice <strong>{searchInvoice}</strong> tidak ditemukan. Mohon pastikan ejaan nomor invoice sudah sesuai.
+                Nomor transaksi <strong>{searchInvoice}</strong> tidak ditemukan. Pastikan nomor diawali dengan <strong>INV-</strong> (Pesanan) atau <strong>REQ-</strong> (Request Barang).
               </span>
             </div>
           )}
@@ -167,8 +231,19 @@ export const OrderTrackingView: React.FC = () => {
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Nomor Invoice Resmi
                 </span>
-                <div className="text-xl font-mono-nums font-extrabold text-blue-900">
-                  {currentOrder.invoiceNumber}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xl font-mono font-extrabold text-blue-900">
+                    {currentOrder.invoiceNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyCode(currentOrder.invoiceNumber)}
+                    className="p-1 hover:bg-slate-100 text-slate-500 rounded cursor-pointer transition-colors"
+                    title="Salin No. Invoice"
+                  >
+                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  {copiedCode && <span className="text-[11px] text-emerald-600 font-semibold">Tersalin!</span>}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   Tanggal Pemesanan: {new Date(currentOrder.createdAt).toLocaleDateString('id-ID', { dateStyle: 'long' })}
@@ -422,6 +497,204 @@ export const OrderTrackingView: React.FC = () => {
                     </label>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Request Details View (for Sourcing Tickets) */}
+        {currentRequest && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+            {/* Top Bar Info */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
+              <div>
+                <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Nota Tiket Request Sourcing Barang</span>
+                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xl font-mono font-extrabold text-blue-900">
+                    {currentRequest.ticketNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyCode(currentRequest.ticketNumber)}
+                    className="p-1 hover:bg-slate-100 text-slate-500 rounded cursor-pointer transition-colors"
+                    title="Salin No. Tiket"
+                  >
+                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  {copiedCode && <span className="text-[11px] text-emerald-600 font-semibold">Tersalin!</span>}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Tanggal Pengajuan: {new Date(currentRequest.createdAt).toLocaleDateString('id-ID', { dateStyle: 'long' })} · Sentra: <strong>{currentRequest.outletId === 'TANAH_ABANG' ? 'Tanah Abang (Jakarta)' : 'Pasar Aur Kuning (Bukittinggi)'}</strong>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={getWhatsappChatUrl(
+                    getEffectiveWhatsapp(storeSettings, 'request', activeOutletInfo.whatsappNumber),
+                    formatWhatsappRequestNotaMessage(storeSettings, currentRequest, activeOutletInfo.name)
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat WhatsApp Admin</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Pipeline Status Progress for Request */}
+            <div>
+              <div className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4">
+                Status Pencarian Barang:
+              </div>
+
+              <div className="overflow-x-auto pb-2">
+                <div className="min-w-[500px] flex items-center justify-between relative">
+                  <div className="absolute top-3 left-4 right-4 h-1 bg-slate-200 -z-0" />
+                  {REQUEST_STEPS.map((step, idx) => {
+                    const currentIdx = getRequestStepIndex(currentRequest.status);
+                    const isDone = idx <= currentIdx;
+                    const isCurrent = idx === currentIdx;
+
+                    return (
+                      <div key={step} className="flex flex-col items-center relative z-10 text-center flex-1">
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                            isCurrent
+                              ? 'bg-amber-600 text-white ring-4 ring-amber-100 shadow-sm'
+                              : isDone
+                              ? 'bg-blue-900 text-white'
+                              : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {isDone ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
+                        </div>
+                        <span
+                          className={`text-[10px] mt-1.5 max-w-20 leading-tight ${
+                            isCurrent
+                              ? 'font-bold text-amber-600'
+                              : isDone
+                              ? 'font-semibold text-slate-900'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {step}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Request Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <div className="font-bold text-slate-900 text-sm">{currentRequest.itemName}</div>
+                <div className="text-slate-600">Kategori: <strong>{currentRequest.category}</strong></div>
+                <div className="text-slate-600">Jumlah / Partai: <strong>{currentRequest.quantity}</strong></div>
+                <div className="text-slate-600">Target Budget: <strong>{currentRequest.targetBudget}</strong></div>
+                {currentRequest.description && (
+                  <div className="text-slate-600">Deskripsi: {currentRequest.description}</div>
+                )}
+                {currentRequest.notes && (
+                  <div className="text-slate-500 italic">Catatan: {currentRequest.notes}</div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <div className="font-bold text-slate-800">Identitas Pemesan</div>
+                <div className="text-slate-600">Nama: <strong>{currentRequest.customerName}</strong></div>
+                <div className="text-slate-600">Nomor WhatsApp: <strong>{currentRequest.customerWhatsapp}</strong></div>
+                <div className="text-slate-600">
+                  Status Saat Ini:{' '}
+                  <span className="font-bold text-blue-900 px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
+                    {currentRequest.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Buyer Uploaded Reference Photos */}
+            {currentRequest.photoUrls && currentRequest.photoUrls.length > 0 && (
+              <div>
+                <div className="text-xs font-bold text-slate-800 mb-2">Foto Referensi yang Anda Unggah:</div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {currentRequest.photoUrls.map((url, i) => (
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                      <img src={url} alt={`Referensi ${i + 1}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Admin Offer Card (if stall offer has been made) */}
+            {currentRequest.adminOffer ? (
+              <div className="p-5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-5 h-5 text-amber-700" />
+                    <span className="text-sm font-bold text-amber-950">
+                      Penawaran Resmi dari Lapak Grosir!
+                    </span>
+                  </div>
+                  <span className="text-base font-extrabold text-blue-900 font-mono">
+                    {formatRupiah(currentRequest.adminOffer.totalOffer || currentRequest.adminOffer.itemPricePerUnit)}
+                  </span>
+                </div>
+
+                {currentRequest.adminOffer.foundStoreLocation && (
+                  <div className="text-xs text-amber-900">
+                    Lapak Sourcing: <strong>{currentRequest.adminOffer.foundStoreLocation}</strong>
+                  </div>
+                )}
+
+                {currentRequest.adminOffer.adminNotes && (
+                  <div className="text-xs text-amber-800 leading-relaxed bg-white/70 p-3 rounded-lg border border-amber-200">
+                    {currentRequest.adminOffer.adminNotes}
+                  </div>
+                )}
+
+                {currentRequest.adminOffer.storePhotoUrl && (
+                  <div>
+                    <span className="text-xs font-semibold text-amber-900 block mb-1.5">
+                      Foto Barang Asli dari Lapak:
+                    </span>
+                    <div className="w-48 aspect-square rounded-lg overflow-hidden border border-amber-300">
+                      <img
+                        src={currentRequest.adminOffer.storePhotoUrl}
+                        alt="Foto Lapak"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {currentRequest.status !== 'Disetujui Customer' && currentRequest.status !== 'Selesai' && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleApproveOffer(currentRequest.id)}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2 transition-colors"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Setujui Harga Penawaran Ini</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center gap-2.5">
+                <Clock className="w-4 h-4 text-blue-700 shrink-0" />
+                <span>
+                  Tim lapangan kami sedang mendatangi lapak-lapak di sentra grosir. Penawaran harga &amp; foto sampel barang akan tampil di sini segera setelah ditemukan.
+                </span>
               </div>
             )}
           </div>

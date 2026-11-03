@@ -96,21 +96,28 @@ export const AdminLoginModal: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                PIN Admin / Owner
+              <label htmlFor="admin_secret_auth_code" className="block text-xs font-bold text-slate-700 mb-1.5">
+                PIN Keamanan Admin / Owner
               </label>
               <div className="relative">
                 <input
+                  id="admin_secret_auth_code"
+                  name="admin_secret_auth_code"
                   type={showPin ? 'text' : 'password'}
                   inputMode="numeric"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-form-type="other"
                   value={pin}
                   onChange={(e) => {
                     setPin(e.target.value);
                     if (errorMsg) setErrorMsg('');
                   }}
-                  placeholder="Ketik PIN (Default: 1234)"
+                  placeholder="Ketik PIN Keamanan Anda"
                   autoFocus
                   maxLength={10}
                   className="w-full pl-9 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900 tracking-wider font-mono"
@@ -120,20 +127,14 @@ export const AdminLoginModal: React.FC = () => {
                   type="button"
                   onClick={() => setShowPin(!showPin)}
                   className="p-1 text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
+                  tabIndex={-1}
                 >
                   {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500">
-                <span>PIN Bawaan Default: <code className="bg-slate-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">1234</code></span>
-                <button
-                  type="button"
-                  onClick={() => setPin('1234')}
-                  className="text-amber-600 hover:text-amber-700 font-semibold underline cursor-pointer"
-                >
-                  Isi Otomatis
-                </button>
-              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Akses terproteksi. Fitur auto-fill browser dinonaktifkan demi privasi &amp; keamanan lapak.
+              </p>
             </div>
 
             <button
