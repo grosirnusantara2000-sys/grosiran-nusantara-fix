@@ -83,7 +83,15 @@ export const Checkout: React.FC = () => {
         wholesalePrice: item.product.wholesalePrice,
         jokiFee: 0,
         quantity: item.quantity,
-        color: item.selectedColor || '',
+        color: [
+          item.selectedColor,
+          item.selectedVariants &&
+            Object.entries(item.selectedVariants)
+              .map(([g, v]) => `${g}: ${v}`)
+              .join(', '),
+        ]
+          .filter(Boolean)
+          .join(' | '),
         size: item.selectedSize || '',
         imageUrl: item.product.imageUrl,
       }));

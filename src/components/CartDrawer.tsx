@@ -95,16 +95,29 @@ export const CartDrawer: React.FC = () => {
                       </button>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                    <div className="text-[11px] text-slate-900 font-bold flex flex-wrap items-center gap-1.5 mt-0.5">
                       {item.selectedColor && <span>{item.selectedColor}</span>}
                       {item.selectedColor && item.selectedSize && <span>·</span>}
                       {item.selectedSize && <span>{item.selectedSize}</span>}
+                      {item.selectedVariants &&
+                        Object.entries(item.selectedVariants).map(([g, v]) => (
+                          <span
+                            key={g}
+                            className="bg-amber-100 text-slate-950 px-1.5 py-0.5 rounded border border-amber-300 text-[10px] font-black"
+                          >
+                            {g}: {v}
+                          </span>
+                        ))}
                     </div>
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
-                    <div className="text-xs font-bold text-slate-900 font-mono-nums">
-                      {formatRupiah(item.product.wholesalePrice * item.quantity)}
+                    <div className="text-xs font-black text-slate-950 font-mono">
+                      {item.product.askAdminPrice || item.product.wholesalePrice <= 0 ? (
+                        <span className="text-amber-800 font-bold">Tanyakan Admin</span>
+                      ) : (
+                        formatRupiah(item.product.wholesalePrice * item.quantity)
+                      )}
                     </div>
 
                     <div className="flex items-center border border-slate-300 rounded-md bg-white">

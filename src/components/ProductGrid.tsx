@@ -38,7 +38,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, categories, 
 
       // Category matching
       if (selectedCategorySlug) {
-        const cat = categories.find((c) => c.slug === selectedCategorySlug);
+        const cat = categories.find((c) => c.slug === selectedCategorySlug || c.id === selectedCategorySlug);
         if (cat && prod.categoryId !== cat.id) return false;
       }
 
@@ -56,7 +56,8 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, categories, 
     });
   }, [products, categories, searchQuery, selectedCategorySlug, maxPriceFilter, sortBy]);
 
-  const activeCategoryName = categories.find((c) => c.slug === selectedCategorySlug)?.name || 'Semua Produk';
+  const activeCategoryName =
+    categories.find((c) => c.slug === selectedCategorySlug || c.id === selectedCategorySlug)?.name || 'Semua Produk';
 
   return (
     <section id="catalog-section" className="py-12 bg-slate-50">
@@ -64,14 +65,14 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, categories, 
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 text-xs font-black text-amber-800 uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               <span>Katalog Grosir Resmi – {activeOutletInfo.shortName}</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 mt-1">
               {selectedCategorySlug ? activeCategoryName : `Pilihan Komoditas Grosir ${activeOutletInfo.name}`}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-900 font-bold mt-1">
               Harga partai besar langsung dari toko &amp; konveksi {activeOutletInfo.name} ({activeOutletInfo.city}) dengan jaminan transparansi nota lapak asli.
             </p>
           </div>

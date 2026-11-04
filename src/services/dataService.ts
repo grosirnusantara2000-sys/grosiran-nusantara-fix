@@ -53,15 +53,43 @@ export function cleanFirestoreData<T>(obj: T): T {
   return cleaned as T;
 }
 
-// Fetch Products from Firestore with auto-seeding to ensure cloud persistence across all users
+export function getDeletedProductIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem('grosir_deleted_product_ids');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {}
+  return new Set();
+}
+
+export function markProductAsDeleted(productId: string) {
+  try {
+    const set = getDeletedProductIds();
+    set.add(productId);
+    localStorage.setItem('grosir_deleted_product_ids', JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function unmarkProductAsDeleted(productId: string) {
+  try {
+    const set = getDeletedProductIds();
+    set.delete(productId);
+    localStorage.setItem('grosir_deleted_product_ids', JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+// Fetch Products from Firestore
 export async function fetchProducts(): Promise<Product[]> {
   const path = 'products';
+  const deletedIds = getDeletedProductIds();
+
   try {
     const snap = await getDocs(collection(db, path));
     if (!snap.empty) {
       const list: Product[] = [];
       snap.forEach((docItem) => {
         const item = docItem.data() as Product;
+        if (deletedIds.has(item.id)) return; // Skip deleted products
+
         // Strictly normalize outletId & image URLs
         if (!item.outletId) {
           item.outletId = item.id.startsWith('prod-ta') ? 'TANAH_ABANG' : 'AUR_KUNING';
@@ -75,61 +103,44 @@ export async function fetchProducts(): Promise<Product[]> {
         list.push(item);
       });
 
-      // Auto-merge any initial products that might not have been seeded yet (e.g. Tanah Abang products)
-      const existingIds = new Set(list.map((p) => p.id));
-      const missingInitial = INITIAL_PRODUCTS.filter((ip) => !existingIds.has(ip.id));
-      if (missingInitial.length > 0) {
-        for (const p of missingInitial) {
-          list.push(p);
-          try {
-            await setDoc(doc(db, path, p.id), p, { merge: true });
-          } catch (seedErr) {
-            console.warn('Seeding missing product error:', seedErr);
-          }
-        }
-      }
-
       try {
         localStorage.setItem('aur_kuning_local_products', JSON.stringify(list));
       } catch (e) {}
       return list;
     } else {
-      // First-time sync: Auto-seed all initial catalog products to Cloud Firestore
-      try {
-        for (const p of INITIAL_PRODUCTS) {
-          await setDoc(doc(db, path, p.id), p, { merge: true });
+      // First-time sync ONLY if never seeded before
+      const hasSeededBefore = localStorage.getItem('grosir_has_seeded_catalog') === 'true';
+      if (!hasSeededBefore) {
+        try {
+          for (const p of INITIAL_PRODUCTS) {
+            if (!deletedIds.has(p.id)) {
+              await setDoc(doc(db, path, p.id), p, { merge: true });
+            }
+          }
+          localStorage.setItem('grosir_has_seeded_catalog', 'true');
+        } catch (seedErr) {
+          console.warn('Auto-seed products error:', seedErr);
         }
-      } catch (seedErr) {
-        console.warn('Auto-seed products error:', seedErr);
+        return INITIAL_PRODUCTS.filter((p) => !deletedIds.has(p.id));
       }
-      return INITIAL_PRODUCTS;
+      return [];
     }
   } catch (error) {
     console.warn('Firestore fetch products failed, checking local cache:', error);
   }
 
-  // Fallback to local storage if offline, ensuring all initial products exist
+  // Fallback to local storage if offline
   try {
     const local = localStorage.getItem('aur_kuning_local_products');
     if (local) {
       const parsed: Product[] = JSON.parse(local);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const existingIds = new Set(parsed.map((p) => p.id));
-        const merged: Product[] = parsed.map((p) => ({
-          ...p,
-          outletId: p.outletId || (p.id.startsWith('prod-ta') ? 'TANAH_ABANG' : 'AUR_KUNING'),
-        }));
-        INITIAL_PRODUCTS.forEach((ip) => {
-          if (!existingIds.has(ip.id)) {
-            merged.push(ip);
-          }
-        });
-        return merged;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p) => !deletedIds.has(p.id));
       }
     }
   } catch (e) {}
 
-  return INITIAL_PRODUCTS;
+  return INITIAL_PRODUCTS.filter((p) => !deletedIds.has(p.id));
 }
 
 // Real-time synchronization listener for products across all devices and visitors
@@ -139,22 +150,23 @@ export function subscribeToProducts(onData: (products: Product[]) => void): () =
     const unsubscribe = onSnapshot(
       collection(db, path),
       (snap) => {
+        const deletedIds = getDeletedProductIds();
         if (!snap.empty) {
           const list: Product[] = [];
           snap.forEach((docItem) => {
             const item = docItem.data() as Product;
+            if (deletedIds.has(item.id)) return;
+
             if (!item.outletId) {
               item.outletId = item.id.startsWith('prod-ta') ? 'TANAH_ABANG' : 'AUR_KUNING';
             }
-            list.push(item);
-          });
-
-          // Ensure any missing initial dual-outlet items are present
-          const existingIds = new Set(list.map((p) => p.id));
-          INITIAL_PRODUCTS.forEach((ip) => {
-            if (!existingIds.has(ip.id)) {
-              list.push(ip);
+            if (item.imageUrl) {
+              item.imageUrl = getSafeImageUrl(item.imageUrl);
             }
+            if (item.images && Array.isArray(item.images)) {
+              item.images = item.images.map((img) => getSafeImageUrl(img));
+            }
+            list.push(item);
           });
 
           try {
@@ -162,7 +174,7 @@ export function subscribeToProducts(onData: (products: Product[]) => void): () =
           } catch (e) {}
           onData(list);
         } else {
-          onData(INITIAL_PRODUCTS);
+          onData([]);
         }
       },
       (error) => {
@@ -186,6 +198,23 @@ export async function fetchCategories(): Promise<Category[]> {
       snap.forEach((docItem) => {
         list.push(docItem.data() as Category);
       });
+
+      // Merge with custom categories in local storage if any
+      try {
+        const local = localStorage.getItem('aur_kuning_local_categories');
+        if (local) {
+          const localList: Category[] = JSON.parse(local);
+          const existingIds = new Set(list.map((c) => c.id));
+          localList.forEach((lc) => {
+            if (!existingIds.has(lc.id)) list.push(lc);
+          });
+        }
+      } catch (e) {}
+
+      try {
+        localStorage.setItem('aur_kuning_local_categories', JSON.stringify(list));
+      } catch (e) {}
+
       return list;
     } else {
       try {
@@ -197,8 +226,51 @@ export async function fetchCategories(): Promise<Category[]> {
     }
   } catch (error) {
     console.warn('Using offline initial categories:', error);
+    try {
+      const local = localStorage.getItem('aur_kuning_local_categories');
+      if (local) return JSON.parse(local);
+    } catch (e) {}
     return INITIAL_CATEGORIES;
   }
+}
+
+// Add New Category (Admin Custom Category)
+export async function addCategory(categoryData: { name: string; description?: string; iconName?: string }): Promise<Category> {
+  const path = 'categories';
+  const slug = categoryData.name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-');
+  const catId = `cat-${slug || Date.now()}`;
+
+  const newCat: Category = {
+    id: catId,
+    name: categoryData.name.trim(),
+    slug: slug || `kategori-${Date.now()}`,
+    description: categoryData.description?.trim() || `Kategori grosir ${categoryData.name.trim()}`,
+    iconName: categoryData.iconName || 'Package',
+    productCount: 0,
+  };
+
+  // Update local cache
+  try {
+    const local = localStorage.getItem('aur_kuning_local_categories');
+    const list: Category[] = local ? JSON.parse(local) : [...INITIAL_CATEGORIES];
+    if (!list.some((c) => c.id === newCat.id)) {
+      list.push(newCat);
+      localStorage.setItem('aur_kuning_local_categories', JSON.stringify(list));
+    }
+  } catch (e) {}
+
+  // Persist to Cloud Firestore
+  try {
+    await setDoc(doc(db, path, newCat.id), newCat, { merge: true });
+  } catch (error) {
+    console.warn('Firestore addCategory warning:', error);
+  }
+
+  return newCat;
 }
 
 // Fetch Reviews
@@ -581,6 +653,8 @@ export async function updateOrderDetails(
 // Product Management (Admin/Owner)
 export async function saveProduct(product: Product): Promise<void> {
   const path = 'products';
+  unmarkProductAsDeleted(product.id);
+
   // Always update local cache so changes are instantly reflected in UI
   try {
     const local = localStorage.getItem('aur_kuning_local_products');
@@ -598,12 +672,11 @@ export async function saveProduct(product: Product): Promise<void> {
 
   // Persist to Cloud Firestore
   try {
-    await setDoc(doc(db, path, product.id), product, { merge: true });
+    await setDoc(doc(db, path, product.id), cleanFirestoreData(product), { merge: true });
   } catch (error) {
     console.error('Firestore saveProduct error:', error);
-    // Attempt with merge
     try {
-      await setDoc(doc(db, path, product.id), product);
+      await setDoc(doc(db, path, product.id), cleanFirestoreData(product));
     } catch (retryErr) {
       console.warn('Firestore retry failed:', retryErr);
     }
@@ -612,6 +685,8 @@ export async function saveProduct(product: Product): Promise<void> {
 
 export async function removeProduct(productId: string): Promise<void> {
   const path = 'products';
+  markProductAsDeleted(productId);
+
   // Update local cache
   try {
     const local = localStorage.getItem('aur_kuning_local_products');
@@ -627,6 +702,73 @@ export async function removeProduct(productId: string): Promise<void> {
   } catch (error) {
     console.warn('Firestore delete warning:', error);
   }
+}
+
+// Bulk delete multiple products
+export async function removeMultipleProducts(productIds: string[]): Promise<void> {
+  const path = 'products';
+  if (!productIds || productIds.length === 0) return;
+
+  const idSet = new Set(productIds);
+  productIds.forEach((id) => markProductAsDeleted(id));
+
+  // Update local cache
+  try {
+    const local = localStorage.getItem('aur_kuning_local_products');
+    if (local) {
+      const list: Product[] = JSON.parse(local);
+      const filtered = list.filter((p) => !idSet.has(p.id));
+      localStorage.setItem('aur_kuning_local_products', JSON.stringify(filtered));
+    }
+  } catch (e) {}
+
+  // Delete from Firestore in parallel
+  await Promise.all(
+    productIds.map(async (id) => {
+      try {
+        await deleteDoc(doc(db, path, id));
+      } catch (err) {
+        console.warn(`Firestore delete failed for product ${id}:`, err);
+      }
+    })
+  );
+}
+
+// Bulk save multiple products (for Bulk Import)
+export async function saveMultipleProducts(products: Product[]): Promise<void> {
+  const path = 'products';
+  if (!products || products.length === 0) return;
+
+  products.forEach((p) => unmarkProductAsDeleted(p.id));
+
+  // Update local cache
+  try {
+    const local = localStorage.getItem('aur_kuning_local_products');
+    let list: Product[] = local ? JSON.parse(local) : [...INITIAL_PRODUCTS];
+    const incomingMap = new Map(products.map((p) => [p.id, p]));
+
+    // Replace existing or append
+    list = list.map((p) => incomingMap.get(p.id) || p);
+    products.forEach((p) => {
+      if (!list.some((existing) => existing.id === p.id)) {
+        list.unshift(p);
+      }
+    });
+    localStorage.setItem('aur_kuning_local_products', JSON.stringify(list));
+  } catch (e) {
+    console.warn('Local bulk product storage error:', e);
+  }
+
+  // Persist to Cloud Firestore in parallel batches
+  await Promise.all(
+    products.map(async (p) => {
+      try {
+        await setDoc(doc(db, path, p.id), cleanFirestoreData(p), { merge: true });
+      } catch (err) {
+        console.warn(`Firestore batch save failed for product ${p.id}:`, err);
+      }
+    })
+  );
 }
 
 // Quick inline update for prices

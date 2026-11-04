@@ -49,6 +49,7 @@ export interface Product {
   description: string;
   price: number; // Harga ecer / estimasi
   wholesalePrice: number; // Harga grosir per pcs
+  askAdminPrice?: boolean; // Jika true / harga 0, tampilkan "Tanyakan Admin"
   minOrder: number; // Minimal order (misal 3 pcs, 6 pcs, 12 pcs/1 lusin, 20 pcs/1 kodi)
   unit: string; // 'pcs' | 'lusin' | 'kodi' | 'seri'
   retailPrice?: number; // Harga eceran
@@ -59,6 +60,7 @@ export interface Product {
   inStock: boolean;
   colors?: string[];
   sizes?: string[];
+  customVariants?: { groupName: string; options: string[] }[]; // Unlimited custom variants
   estimatedShoppingDay: string;
   createdAt: string;
   featured?: boolean;
@@ -71,6 +73,7 @@ export interface CartItem {
   quantity: number;
   selectedColor?: string;
   selectedSize?: string;
+  selectedVariants?: Record<string, string>;
 }
 
 export type RequestStatus =

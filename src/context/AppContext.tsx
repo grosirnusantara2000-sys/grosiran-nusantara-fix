@@ -61,7 +61,7 @@ interface AppContextType {
 
   // Cart
   cart: CartItem[];
-  addToCart: (product: Product, quantity?: number, color?: string, size?: string) => void;
+  addToCart: (product: Product, quantity?: number, color?: string, size?: string, customVariants?: Record<string, string>) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -321,14 +321,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isAdmin = isAdminLoggedIn || adminSimulation || (!!user && user.email === ADMIN_EMAIL);
 
   // Cart operations
-  const addToCart = (product: Product, quantity = product.minOrder, color?: string, size?: string) => {
+  const addToCart = (
+    product: Product,
+    quantity = product.minOrder,
+    color?: string,
+    size?: string,
+    customVariants?: Record<string, string>
+  ) => {
     const actualQty = Math.max(quantity, product.minOrder);
     setCart((prev) => {
       const existingIndex = prev.findIndex(
         (item) =>
           item.product.id === product.id &&
           item.selectedColor === color &&
-          item.selectedSize === size
+          item.selectedSize === size &&
+          JSON.stringify(item.selectedVariants || {}) === JSON.stringify(customVariants || {})
       );
       if (existingIndex > -1) {
         const next = [...prev];
@@ -342,6 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           quantity: actualQty,
           selectedColor: color || product.colors?.[0],
           selectedSize: size || product.sizes?.[0],
+          selectedVariants: customVariants,
         },
       ];
     });

@@ -270,6 +270,14 @@ const AppContent: React.FC = () => {
           setEditingProductModal(null);
         }}
         productToEdit={editingProductModal}
+        onCategoryAdded={(newCat) => {
+          setCategories((prev) => {
+            if (!prev.some((c) => c.id === newCat.id)) {
+              return [...prev, newCat];
+            }
+            return prev;
+          });
+        }}
       />
 
       <CartDrawer />
