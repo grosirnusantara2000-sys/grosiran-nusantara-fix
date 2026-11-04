@@ -154,19 +154,22 @@ export const ProductManagementView: React.FC = () => {
   const confirmSingleDelete = async () => {
     if (!productToDelete) return;
     setIsDeleting(true);
+    const targetId = productToDelete.id;
+    const targetName = productToDelete.name;
     try {
-      await removeProduct(productToDelete.id);
-      showToast(`Produk "${productToDelete.name}" berhasil dihapus permanen`, 'info');
+      setProducts((prev) => prev.filter((p) => p.id !== targetId));
       setSelectedProductIds((prev) => {
         const next = new Set(prev);
-        next.delete(productToDelete.id);
+        next.delete(targetId);
         return next;
       });
       setProductToDelete(null);
+      await removeProduct(targetId);
+      showToast(`Produk "${targetName}" berhasil dihapus permanen`, 'info');
       triggerRefresh();
-      loadData();
     } catch (err: any) {
       showToast('Gagal menghapus produk: ' + err.message, 'error');
+      loadData();
     } finally {
       setIsDeleting(false);
     }
@@ -177,15 +180,18 @@ export const ProductManagementView: React.FC = () => {
     const ids = Array.from(selectedProductIds);
     if (ids.length === 0) return;
     setIsDeleting(true);
+    const count = ids.length;
+    const idSet = new Set(ids);
     try {
-      await removeMultipleProducts(ids);
-      showToast(`${ids.length} produk berhasil dihapus dari katalog!`, 'success');
+      setProducts((prev) => prev.filter((p) => !idSet.has(p.id)));
       setSelectedProductIds(new Set());
       setIsBulkDeleteModalOpen(false);
+      await removeMultipleProducts(ids);
+      showToast(`${count} produk berhasil dihapus dari katalog!`, 'success');
       triggerRefresh();
-      loadData();
     } catch (err: any) {
       showToast('Gagal menghapus produk terpilih: ' + err.message, 'error');
+      loadData();
     } finally {
       setIsDeleting(false);
     }

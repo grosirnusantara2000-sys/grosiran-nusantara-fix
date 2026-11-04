@@ -29,6 +29,7 @@ export const AdminCustomizationView: React.FC = () => {
   const { storeSettings, updateStoreSettings, showToast } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pin' | 'courier' | 'payment' | 'guide'>('pin');
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ title: string; onConfirm: () => void } | null>(null);
 
   // PIN state
   const [currentPinInput, setCurrentPinInput] = useState('');
@@ -188,10 +189,9 @@ export const AdminCustomizationView: React.FC = () => {
     }
   };
 
-  const handleDeleteCourier = async (id: string) => {
+  const executeDeleteCourier = async (id: string) => {
     const target = couriers.find((c) => c.id === id);
     if (!target) return;
-    if (!confirm(`Hapus ekspedisi "${target.name}"?`)) return;
 
     const updated = couriers.filter((c) => c.id !== id);
     setCouriers(updated);
@@ -205,6 +205,15 @@ export const AdminCustomizationView: React.FC = () => {
     } catch (err: any) {
       showToast('Gagal menghapus ekspedisi', 'error');
     }
+  };
+
+  const handleDeleteCourier = (id: string) => {
+    const target = couriers.find((c) => c.id === id);
+    if (!target) return;
+    setDeleteConfirmItem({
+      title: `Hapus ekspedisi "${target.name}" dari pilihan pengiriman pelanggan?`,
+      onConfirm: () => executeDeleteCourier(id),
+    });
   };
 
   // Bank Accounts Actions
@@ -230,10 +239,9 @@ export const AdminCustomizationView: React.FC = () => {
     }
   };
 
-  const handleDeleteBank = async (id: string) => {
+  const executeDeleteBank = async (id: string) => {
     const target = bankAccounts.find((b) => b.id === id);
     if (!target) return;
-    if (!confirm(`Hapus rekening "${target.bankName}"?`)) return;
 
     const updated = bankAccounts.filter((b) => b.id !== id);
     setBankAccounts(updated);
@@ -247,6 +255,15 @@ export const AdminCustomizationView: React.FC = () => {
     } catch (err: any) {
       showToast('Gagal menghapus rekening', 'error');
     }
+  };
+
+  const handleDeleteBank = (id: string) => {
+    const target = bankAccounts.find((b) => b.id === id);
+    if (!target) return;
+    setDeleteConfirmItem({
+      title: `Hapus rekening "${target.bankName}" (${target.accountNumber})?`,
+      onConfirm: () => executeDeleteBank(id),
+    });
   };
 
   // Order Guides Actions
@@ -272,10 +289,9 @@ export const AdminCustomizationView: React.FC = () => {
     }
   };
 
-  const handleDeleteGuide = async (id: string) => {
+  const executeDeleteGuide = async (id: string) => {
     const target = orderGuides.find((g) => g.id === id);
     if (!target) return;
-    if (!confirm(`Hapus panduan "${target.title}"?`)) return;
 
     const updated = orderGuides.filter((g) => g.id !== id);
     setOrderGuides(updated);
@@ -289,6 +305,15 @@ export const AdminCustomizationView: React.FC = () => {
     } catch (err: any) {
       showToast('Gagal menghapus panduan', 'error');
     }
+  };
+
+  const handleDeleteGuide = (id: string) => {
+    const target = orderGuides.find((g) => g.id === id);
+    if (!target) return;
+    setDeleteConfirmItem({
+      title: `Hapus langkah panduan "${target.title}"?`,
+      onConfirm: () => executeDeleteGuide(id),
+    });
   };
 
   return (
@@ -964,6 +989,46 @@ export const AdminCustomizationView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* In-App Deletion Confirmation Modal (eliminating window.confirm) */}
+      {deleteConfirmItem && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border-2 border-red-500 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-base font-black text-slate-950">
+                Konfirmasi Hapus Data
+              </h3>
+            </div>
+
+            <p className="text-xs font-bold text-slate-900 mb-5 leading-relaxed">
+              {deleteConfirmItem.title}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmItem(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteConfirmItem.onConfirm();
+                  setDeleteConfirmItem(null);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+              >
+                Ya, Hapus Sekarang
+              </button>
+            </div>
           </div>
         </div>
       )}

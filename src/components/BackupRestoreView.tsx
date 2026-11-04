@@ -153,12 +153,6 @@ export const BackupRestoreView: React.FC = () => {
   // 4. Confirm and Restore
   const handleExecuteRestore = async () => {
     if (!uploadedBackup) return;
-
-    const confirmed = window.confirm(
-      'Apakah Anda yakin ingin memulihkan database dari file ini? Data yang ada akan disinkronkan dan diperbarui dengan isi file cadangan.'
-    );
-    if (!confirmed) return;
-
     setIsRestoring(true);
     try {
       const result = await restoreDatabaseSnapshot(uploadedBackup);

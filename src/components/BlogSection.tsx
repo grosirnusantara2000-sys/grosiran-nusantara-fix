@@ -8,8 +8,61 @@ interface BlogSectionProps {
   articles: Article[];
 }
 
+const ArticleCoverImage: React.FC<{
+  src: string;
+  alt: string;
+  fallbackSrc?: string;
+  tag?: string;
+}> = ({ src, alt, fallbackSrc, tag }) => {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  const handleError = () => {
+    if (fallbackSrc && imgSrc !== fallbackSrc) {
+      setImgSrc(fallbackSrc);
+    } else {
+      setHasFailed(true);
+    }
+  };
+
+  if (hasFailed) {
+    return (
+      <div className="w-full h-full bg-linear-to-br from-slate-900 via-slate-800 to-amber-950 flex flex-col items-center justify-center p-6 text-center text-white relative select-none">
+        <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center mb-2">
+          <BookOpen className="w-6 h-6 text-amber-400" />
+        </div>
+        <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full mb-1">
+          {tag || 'Panduan Grosir'}
+        </span>
+        <span className="text-xs font-black line-clamp-2 text-slate-100 max-w-[220px]">
+          {alt}
+        </span>
+        <span className="text-[9px] font-mono text-slate-400 mt-2 font-bold tracking-wider">
+          GROSIR NUSANTARA
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={alt}
+      className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
+      onError={handleError}
+    />
+  );
+};
+
 export const BlogSection: React.FC<BlogSectionProps> = ({ articles }) => {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+
+  const getVerifiedFallback = (art: Article) => {
+    if (art.id === 'art-01') return '/assets/images/hero_pasar_aur_kuning_1793527995583.jpg';
+    if (art.id === 'art-02') return '/assets/images/about_aur_kuning_packing_1793527996506.jpg';
+    if (art.id === 'art-03') return '/assets/images/product_grosir_fashion_1793527996022.jpg';
+    return DEFAULT_PRODUCT_IMAGE;
+  };
 
   return (
     <section className="py-16 bg-white min-h-[85vh]">
@@ -36,17 +89,11 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ articles }) => {
             >
               <div>
                 <div className="aspect-16/9 w-full bg-slate-200 overflow-hidden">
-                  <img
+                  <ArticleCoverImage
                     src={getSafeImageUrl(art.coverImage)}
                     alt={art.title}
-                    className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (!target.src.includes('product_grosir_fashion')) {
-                        target.src = DEFAULT_PRODUCT_IMAGE;
-                      }
-                    }}
+                    fallbackSrc={getVerifiedFallback(art)}
+                    tag={art.tags?.[0]}
                   />
                 </div>
 
@@ -90,16 +137,11 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ articles }) => {
               </button>
 
               <div className="aspect-16/9 w-full rounded-xl overflow-hidden mb-6 bg-slate-100">
-                <img
+                <ArticleCoverImage
                   src={getSafeImageUrl(selectedArticle.coverImage)}
                   alt={selectedArticle.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.src.includes('product_grosir_fashion')) {
-                      target.src = DEFAULT_PRODUCT_IMAGE;
-                    }
-                  }}
+                  fallbackSrc={getVerifiedFallback(selectedArticle)}
+                  tag={selectedArticle.tags?.[0]}
                 />
               </div>
 

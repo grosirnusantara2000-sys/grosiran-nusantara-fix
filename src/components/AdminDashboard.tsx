@@ -63,6 +63,7 @@ import { ActivityLogView } from './ActivityLogView';
 import { BackupRestoreView } from './BackupRestoreView';
 import { ThermalReceiptModal } from './ThermalReceiptModal';
 import { AdminCustomizationView } from './AdminCustomizationView';
+import { ProductManagementView } from './ProductManagementView';
 import { formatWhatsappReceiptText } from '../services/dataService';
 import { compressMultipleImageFiles, getSafeImageUrl, DEFAULT_PRODUCT_IMAGE } from '../utils/imageUtils';
 
@@ -284,7 +285,6 @@ export const AdminDashboard: React.FC = () => {
 
   // Handle Delete Product
   const handleDeleteProduct = async (id: string, name: string) => {
-    if (!window.confirm(`Hapus produk "${name}" dari katalog grosir?`)) return;
     try {
       await removeProduct(id);
       await recordActivityLog(
@@ -1026,143 +1026,8 @@ export const AdminDashboard: React.FC = () => {
 
           {/* VIEW 7: INVENTORI & PRODUK */}
           {activeMenu === 'inventory_products' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Package className="w-5 h-5 text-amber-500" />
-                    Manajemen Inventori &amp; Katalog Grosir
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Atur harga grosir, minimal pesanan, foto produk lapak sentra grosir, dan satuan kodi/lusin/pcs.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingProduct({
-                        id: 'prod-' + Date.now(),
-                        name: '',
-                        categoryId: categories[0]?.id || 'cat-pakaian-wanita',
-                        categoryName: categories[0]?.name || 'Pakaian Wanita',
-                        description: '',
-                        price: 65000,
-                        wholesalePrice: 45000,
-                        minOrder: 6,
-                        unit: 'pcs',
-                        jokiFee: 0,
-                        imageUrl: '/public/assets/aistudio/IMG_20261101_180521_d21841f0.jpg',
-                        inStock: true,
-                        estimatedShoppingDay: 'Lapak Sentra Grosir',
-                        createdAt: new Date().toISOString(),
-                      });
-                      setIsProductModalOpen(true);
-                    }}
-                    className="px-3.5 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Produk Baru</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Products Table */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
-                        <th className="py-3 px-4">Barang</th>
-                        <th className="py-3 px-4">Kategori</th>
-                        <th className="py-3 px-4 text-right">Harga Grosir</th>
-                        <th className="py-3 px-4 text-center">Satuan</th>
-                        <th className="py-3 px-4 text-center">Min. Order</th>
-                        <th className="py-3 px-4 text-center">Status</th>
-                        <th className="py-3 px-4 text-center">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {products.map((prod) => (
-                        <tr key={prod.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={prod.imageUrl}
-                                alt={prod.name}
-                                className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
-                              />
-                              <div>
-                                <div className="font-semibold text-slate-900 line-clamp-1">{prod.name}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">ID: {prod.id}</div>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-4 text-slate-600">
-                            {prod.categoryName}
-                          </td>
-
-                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                            Rp{prod.wholesalePrice.toLocaleString('id-ID')}
-                          </td>
-
-                          <td className="py-3 px-4 text-center font-mono text-slate-700 font-medium">
-                            {prod.unit || 'pcs'}
-                          </td>
-
-                          <td className="py-3 px-4 text-center font-mono">
-                            {prod.minOrder} {prod.unit}
-                          </td>
-
-                          <td className="py-3 px-4 text-center">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                prod.inStock
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {prod.inStock ? 'Ready' : 'Habis'}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setQuickPriceEditProduct(prod)}
-                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[11px] font-semibold transition-colors cursor-pointer"
-                                title="Edit Cepat Harga"
-                              >
-                                Edit Harga
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingProduct(prod);
-                                  setIsProductModalOpen(true);
-                                }}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition-colors cursor-pointer"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <div className="space-y-4">
+              <ProductManagementView />
             </div>
           )}
 

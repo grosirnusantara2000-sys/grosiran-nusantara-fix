@@ -24,6 +24,8 @@ import {
   MapPin,
   RefreshCw,
   Sliders,
+  Package,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const AppSidebar: React.FC = () => {
@@ -332,6 +334,27 @@ export const AppSidebar: React.FC = () => {
               </div>
 
               <div className="space-y-0.5 mt-0.5">
+                {/* Kelola Produk & Harga (Direct Access) */}
+                {matchesSearch('Kelola Produk Manajemen Harga') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('manage-products')}
+                    className={`w-full px-3 py-2 rounded-lg flex items-center justify-between transition-colors text-left cursor-pointer ${
+                      currentView === 'manage-products'
+                        ? 'bg-amber-500 text-slate-950 font-black border-l-3 border-slate-950 shadow-sm'
+                        : 'hover:bg-[#242c38] text-amber-300 font-bold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Package className="w-4 h-4 shrink-0 text-amber-400" />
+                      <span>Kelola Produk &amp; Harga</span>
+                    </div>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-black">
+                      Katalog
+                    </span>
+                  </button>
+                )}
+
                 {/* Profil Toko */}
                 {matchesSearch('Profil Toko Struk') && (
                   <button
