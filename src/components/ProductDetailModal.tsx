@@ -41,10 +41,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   } = useApp();
 
   const isAskAdmin = !!product.askAdminPrice || product.wholesalePrice <= 0;
+  const effectiveMinOrder = product.allowRetail ? 1 : (product.minOrder || 1);
 
-  const [quantity, setQuantity] = useState(product.minOrder);
-  const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
-  const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '');
+  const [quantity, setQuantity] = useState(effectiveMinOrder);
+  const validColors = React.useMemo(() => (product.colors || []).filter((c) => c && c.trim()), [product.colors]);
+  const validSizes = React.useMemo(() => (product.sizes || []).filter((s) => s && s.trim()), [product.sizes]);
+  const [selectedColor, setSelectedColor] = useState(validColors[0] || '');
+  const [selectedSize, setSelectedSize] = useState(validSizes[0] || '');
   
   // Custom Variants Selection: { [groupName]: option }
   const [selectedCustomVariants, setSelectedCustomVariants] = useState<Record<string, string>>(() => {
@@ -81,11 +84,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
 
   const formatRupiah = (num: number) => 'Rp ' + num.toLocaleString('id-ID');
 
-  const subtotalItem = product.wholesalePrice * quantity;
+  const normalizedWholesale = product.wholesalePrice > 0 && product.wholesalePrice < 1000 ? product.wholesalePrice * 1000 : product.wholesalePrice;
+  const subtotalItem = normalizedWholesale * quantity;
   const grandTotal = subtotalItem;
 
   const handleIncrement = () => setQuantity((prev) => prev + 1);
-  const handleDecrement = () => setQuantity((prev) => Math.max(product.minOrder, prev - 1));
+  const handleDecrement = () => setQuantity((prev) => Math.max(effectiveMinOrder, prev - 1));
 
   const handleAddToCart = () => {
     addToCart(product, quantity, selectedColor, selectedSize, selectedCustomVariants);
@@ -266,7 +270,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
               {isAskAdmin ? (
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-950">Harga Grosir Lapak:</span>
+                    <span className="text-xs font-black text-slate-950">Harga:</span>
                     <span className="px-3 py-1 bg-amber-300 text-slate-950 border border-amber-500 rounded-xl font-black text-sm shadow-xs">
                       Tanyakan Admin
                     </span>
@@ -276,42 +280,39 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   </p>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-xs font-black text-slate-900">Harga Grosir Lapak:</span>
-                    <span className="text-xl font-black text-slate-950 font-mono">
-                      {formatRupiah(product.wholesalePrice)}
-                      <span className="text-xs font-bold text-slate-700 font-sans"> /{product.unit}</span>
-                    </span>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-slate-950">Harga:</span>
+                    {product.allowRetail && (
+                      <span className="text-[11px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2.5 py-0.5 rounded-md font-black">
+                        ✓ Bisa Beli Eceran
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-baseline justify-between mb-1.5 text-xs">
-                    <span className="text-slate-900 font-bold">Harga Eceran Toko:</span>
-                    <span className="font-black text-emerald-800 font-mono">
-                      {formatRupiah(product.retailPrice || product.price)} /{product.unit}
-                    </span>
+                  <div className="text-2xl font-black text-slate-950 font-mono">
+                    {formatRupiah(normalizedWholesale)}
+                    <span className="text-xs font-bold text-slate-700 font-sans"> /{product.unit}</span>
                   </div>
-                  <div className="pt-2 border-t border-slate-300 flex items-baseline justify-between">
-                    <span className="text-xs font-black text-slate-950">Harga per {product.unit}:</span>
-                    <span className="text-lg font-black text-slate-950 font-mono">
-                      {formatRupiah(product.wholesalePrice)}
-                    </span>
-                  </div>
-                </>
+                </div>
               )}
 
-              <div className="mt-2 text-[11px] text-slate-800 font-bold pt-1 border-t border-slate-200">
-                * Minimal pembelian grosir: <strong className="text-slate-950 font-mono font-black">{product.minOrder} {product.unit}</strong>
+              <div className="mt-2 text-[11px] text-slate-800 font-bold pt-1.5 border-t border-slate-200">
+                {product.allowRetail ? (
+                  <span>✓ <strong className="text-emerald-900 font-black">Bisa beli eceran / satuan</strong> (1 {product.unit}) maupun grosir partai.</span>
+                ) : (
+                  <span>* Minimal pembelian grosir: <strong className="text-slate-950 font-mono font-black">{product.minOrder} {product.unit}</strong></span>
+                )}
               </div>
             </div>
 
-            {/* Colors Variant Selector */}
-            {product.colors && product.colors.length > 0 && (
+            {/* Colors Variant Selector - Only rendered if colors are entered */}
+            {validColors.length > 0 && (
               <div className="mt-4">
                 <label className="text-xs font-black text-slate-950 block mb-2">
                   Pilihan Seri Warna / Motif:
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {product.colors.map((color) => (
+                  {validColors.map((color) => (
                     <button
                       key={color}
                       type="button"
@@ -329,14 +330,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
               </div>
             )}
 
-            {/* Sizes Variant Selector */}
-            {product.sizes && product.sizes.length > 0 && (
+            {/* Sizes Variant Selector - Only rendered if sizes are entered */}
+            {validSizes.length > 0 && (
               <div className="mt-4">
                 <label className="text-xs font-black text-slate-950 block mb-2">
                   Pilihan Seri Ukuran / Size:
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size) => (
+                  {validSizes.map((size) => (
                     <button
                       key={size}
                       type="button"
@@ -354,10 +355,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
               </div>
             )}
 
-            {/* Unlimited Custom Variants Interactive Display */}
-            {product.customVariants && product.customVariants.length > 0 && (
+            {/* Unlimited Custom Variants Interactive Display - Only rendered if custom groups exist */}
+            {product.customVariants && product.customVariants.filter((cv) => cv.groupName && cv.options && cv.options.length > 0).length > 0 && (
               <div className="mt-4 space-y-3 pt-2 border-t border-slate-200">
-                {product.customVariants.map((grp, gIdx) => (
+                {product.customVariants
+                  .filter((cv) => cv.groupName && cv.options && cv.options.length > 0)
+                  .map((grp, gIdx) => (
                   <div key={gIdx}>
                     <label className="text-xs font-black text-slate-950 block mb-2">
                       Pilihan {grp.groupName}:

@@ -141,19 +141,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
               </div>
             </div>
           ) : (
-            <div className="flex items-baseline justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-700">Harga Grosir Lapak</div>
-                <div className="text-base font-black text-slate-950 font-mono">
-                  {formatRupiah(product.wholesalePrice)}
-                  <span className="text-xs font-bold text-slate-700 font-sans"> /{product.unit}</span>
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[11px] font-bold text-slate-700">Harga:</span>
+                {product.allowRetail && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-1.5 py-0.5 rounded font-black">
+                    Bisa Eceran
+                  </span>
+                )}
               </div>
-              <div className="text-right">
-                <div className="text-[10px] font-bold text-slate-700">Harga Eceran</div>
-                <div className="text-xs font-black text-emerald-800 font-mono">
-                  {formatRupiah(product.retailPrice || product.price)}
-                </div>
+              <div className="text-base font-black text-slate-950 font-mono">
+                {formatRupiah(product.wholesalePrice > 0 && product.wholesalePrice < 1000 ? product.wholesalePrice * 1000 : product.wholesalePrice)}
+                <span className="text-xs font-bold text-slate-700 font-sans"> /{product.unit}</span>
               </div>
             </div>
           )}

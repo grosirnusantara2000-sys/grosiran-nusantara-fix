@@ -49,10 +49,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   
-  // Flexible Pricing: "Tanyakan Admin"
+  // Flexible Pricing & Retail Option
   const [askAdminPrice, setAskAdminPrice] = useState(false);
   const [wholesalePrice, setWholesalePrice] = useState<number | string>(35000);
-  const [retailPrice, setRetailPrice] = useState<number | string>(50000);
+  const [allowRetail, setAllowRetail] = useState(false);
   const [minOrder, setMinOrder] = useState<number>(3);
   const [unit, setUnit] = useState('pcs');
 
@@ -62,11 +62,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Standard Variants
+  // Standard Variants (Default empty - no dummy placeholder text)
   const [inStock, setInStock] = useState(true);
-  const [colors, setColors] = useState<string[]>(['Seri Warna']);
+  const [colors, setColors] = useState<string[]>([]);
   const [newColorInput, setNewColorInput] = useState('');
-  const [sizes, setSizes] = useState<string[]>(['All Size']);
+  const [sizes, setSizes] = useState<string[]>([]);
   const [newSizeInput, setNewSizeInput] = useState('');
 
   // Unlimited Custom Variants
@@ -94,10 +94,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCategoryId(productToEdit.categoryId);
       setDescription(productToEdit.description);
       
-      const isAskAdmin = !!productToEdit.askAdminPrice || productToEdit.wholesalePrice <= 0;
+      const rawPrice = productToEdit.wholesalePrice || productToEdit.price || 0;
+      const normalizedPrice = rawPrice > 0 && rawPrice < 1000 ? rawPrice * 1000 : rawPrice;
+      const isAskAdmin = !!productToEdit.askAdminPrice || normalizedPrice <= 0;
       setAskAdminPrice(isAskAdmin);
-      setWholesalePrice(isAskAdmin ? 0 : productToEdit.wholesalePrice);
-      setRetailPrice(productToEdit.price || productToEdit.retailPrice || 0);
+      setWholesalePrice(isAskAdmin ? 0 : normalizedPrice);
+      setAllowRetail(!!productToEdit.allowRetail);
       setMinOrder(productToEdit.minOrder || 1);
       setUnit(productToEdit.unit || 'pcs');
       
@@ -108,27 +110,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setImageUrl(loadedImgs[0] || productToEdit.imageUrl);
       
       setInStock(productToEdit.inStock !== false);
-      setColors(productToEdit.colors || []);
-      setSizes(productToEdit.sizes || []);
+      // Filter out empty or whitespace strings
+      setColors((productToEdit.colors || []).filter((c) => c && c.trim()));
+      setSizes((productToEdit.sizes || []).filter((s) => s && s.trim()));
       setCustomVariants(productToEdit.customVariants || []);
       setEstimatedShoppingDay(productToEdit.estimatedShoppingDay || 'Hari Pasar');
       setFeatured(!!productToEdit.featured);
       setBestSeller(!!productToEdit.bestSeller);
     } else {
-      // Reset for new product
+      // Reset for new product - strictly clean empty variants
       setName('');
       setCategoryId(categoriesList[0]?.id || 'cat-pakaian-wanita');
       setDescription('');
       setAskAdminPrice(false);
       setWholesalePrice(35000);
-      setRetailPrice(50000);
+      setAllowRetail(false);
       setMinOrder(3);
       setUnit('pcs');
       setImageUrl(PRESET_AUR_KUNING_IMAGES[0].url);
       setImages([PRESET_AUR_KUNING_IMAGES[0].url]);
       setInStock(true);
-      setColors(['Seri 6 Warna']);
-      setSizes(['All Size']);
+      setColors([]);
+      setSizes([]);
       setCustomVariants([]);
       setEstimatedShoppingDay('Hari Pasar (Selasa & Jumat)');
       setFeatured(false);
@@ -278,8 +281,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setIsSubmitting(true);
     try {
       const selectedCategory = categoriesList.find((c) => c.id === categoryId);
-      const parsedWholesale = askAdminPrice ? 0 : Number(wholesalePrice) || 0;
-      const parsedRetail = Number(retailPrice) || (parsedWholesale > 0 ? Math.round(parsedWholesale * 1.25) : 0);
+      let parsedPrice = askAdminPrice ? 0 : Number(wholesalePrice) || 0;
+      // Auto multiply if owner wrote shorthand like 88 (meaning 88.000)
+      if (parsedPrice > 0 && parsedPrice < 1000) {
+        parsedPrice *= 1000;
+      }
+
+      // Filter out any blank strings
+      const cleanedColors = colors.map((c) => c.trim()).filter((c) => c.length > 0);
+      const cleanedSizes = sizes.map((s) => s.trim()).filter((s) => s.length > 0);
 
       const productPayload: Product = {
         id: productToEdit ? productToEdit.id : `prod_${Date.now()}`,
@@ -287,9 +297,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         categoryId,
         categoryName: selectedCategory?.name || 'Grosir Nusantara',
         description: description.trim() || 'Produk grosir original berkualitas langsung dari sentra konveksi tangan pertama.',
-        price: parsedRetail || parsedWholesale,
-        wholesalePrice: parsedWholesale,
-        retailPrice: parsedRetail,
+        price: parsedPrice,
+        wholesalePrice: parsedPrice,
+        retailPrice: parsedPrice,
+        allowRetail: !!allowRetail,
         askAdminPrice,
         jokiFee: 0,
         minOrder: Number(minOrder) || 1,
@@ -298,8 +309,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         images: images.length > 0 ? images : [imageUrl || PRESET_AUR_KUNING_IMAGES[0].url],
         galleryUrls: images.slice(1),
         inStock,
-        colors: colors.length > 0 ? colors : ['Seri Standar'],
-        sizes: sizes.length > 0 ? sizes : ['All Size'],
+        colors: cleanedColors,
+        sizes: cleanedSizes,
         customVariants: customVariants.filter((cv) => cv.options.length > 0),
         estimatedShoppingDay,
         featured,
@@ -489,49 +500,66 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-950 mb-1">
-                    Harga Lapak / Grosir (Rp) <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="500"
-                    required={!askAdminPrice}
-                    value={wholesalePrice}
-                    onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-400 rounded-xl font-mono text-sm font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-[11px] text-slate-800 font-bold">Harga kulakan grosir</span>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black text-slate-950 mb-1">
+                      Harga (Rp) <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="500"
+                      required={!askAdminPrice}
+                      value={wholesalePrice}
+                      onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(wholesalePrice);
+                        if (val > 0 && val < 1000) {
+                          setWholesalePrice(val * 1000);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-400 rounded-xl font-mono text-sm font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <span className="text-[11px] text-slate-800 font-bold block mt-0.5">
+                      Ketik angka (misal <strong className="text-slate-950">88</strong> otomatis menjadi <strong className="text-slate-950">88.000</strong>)
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-950 mb-1">
+                      Minimal Order ({unit}) <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={minOrder}
+                      onChange={(e) => setMinOrder(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-white border border-slate-400 rounded-xl font-mono text-sm font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <span className="text-[11px] text-slate-800 font-bold block mt-0.5">
+                      Syarat minimal pembelian grosir
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-black text-slate-950 mb-1">
-                    Harga Eceran Patokan (Rp)
-                  </label>
+                {/* Checkbox Opsi Bisa Eceran */}
+                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-300">
+                  <div>
+                    <label htmlFor="modal-allow-retail" className="text-xs font-black text-slate-950 block cursor-pointer">
+                      Bisa Eceran
+                    </label>
+                    <span className="text-[11px] text-slate-800 font-bold block">
+                      Centang jika produk ini boleh dibeli eceran / satuan oleh pembeli
+                    </span>
+                  </div>
                   <input
-                    type="number"
-                    step="500"
-                    value={retailPrice}
-                    onChange={(e) => setRetailPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-400 rounded-xl font-mono text-sm font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    type="checkbox"
+                    id="modal-allow-retail"
+                    checked={allowRetail}
+                    onChange={(e) => setAllowRetail(e.target.checked)}
+                    className="w-5 h-5 rounded text-amber-600 accent-amber-600 cursor-pointer"
                   />
-                  <span className="text-[11px] text-slate-800 font-bold">Patokan eceran pelanggan</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-slate-950 mb-1">
-                    Minimal Order ({unit}) <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={minOrder}
-                    onChange={(e) => setMinOrder(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-400 rounded-xl font-mono text-sm font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-[11px] text-slate-800 font-bold">Syarat minimal pembelian</span>
                 </div>
               </div>
             )}
@@ -543,9 +571,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   Tanyakan Admin
                 </span>
               ) : (
-                <span className="font-black font-mono text-sm text-slate-950">
-                  Rp {(Number(wholesalePrice) || 0).toLocaleString('id-ID')} /{unit}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black font-mono text-sm text-slate-950">
+                    Rp {((Number(wholesalePrice) > 0 && Number(wholesalePrice) < 1000 ? Number(wholesalePrice) * 1000 : Number(wholesalePrice)) || 0).toLocaleString('id-ID')} /{unit}
+                  </span>
+                  {allowRetail && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded font-black">
+                      Bisa Eceran
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>

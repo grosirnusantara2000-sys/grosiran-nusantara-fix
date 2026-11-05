@@ -9,16 +9,18 @@ export const QuickPriceEditModal: React.FC = () => {
 
   const [askAdminPrice, setAskAdminPrice] = useState(false);
   const [wholesalePrice, setWholesalePrice] = useState(0);
-  const [retailPrice, setRetailPrice] = useState(0);
+  const [allowRetail, setAllowRetail] = useState(false);
   const [inStock, setInStock] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (quickPriceEditProduct) {
-      const isAskAdmin = !!quickPriceEditProduct.askAdminPrice || quickPriceEditProduct.wholesalePrice <= 0;
+      const rawPrice = quickPriceEditProduct.wholesalePrice || quickPriceEditProduct.price || 0;
+      const normalizedPrice = rawPrice > 0 && rawPrice < 1000 ? rawPrice * 1000 : rawPrice;
+      const isAskAdmin = !!quickPriceEditProduct.askAdminPrice || normalizedPrice <= 0;
       setAskAdminPrice(isAskAdmin);
-      setWholesalePrice(isAskAdmin ? 0 : quickPriceEditProduct.wholesalePrice);
-      setRetailPrice(quickPriceEditProduct.price || quickPriceEditProduct.retailPrice || 0);
+      setWholesalePrice(isAskAdmin ? 0 : normalizedPrice);
+      setAllowRetail(!!quickPriceEditProduct.allowRetail);
       setInStock(quickPriceEditProduct.inStock);
     }
   }, [quickPriceEditProduct]);
@@ -27,10 +29,21 @@ export const QuickPriceEditModal: React.FC = () => {
 
   const formatRupiah = (num: number) => 'Rp ' + (num || 0).toLocaleString('id-ID');
 
+  const handlePriceBlur = () => {
+    if (wholesalePrice > 0 && wholesalePrice < 1000) {
+      setWholesalePrice(wholesalePrice * 1000);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!askAdminPrice && wholesalePrice <= 0) {
-      showToast('Harga grosir harus lebih dari 0 atau aktifkan "Tanyakan Admin"', 'error');
+    let finalPrice = askAdminPrice ? 0 : Number(wholesalePrice) || 0;
+    if (finalPrice > 0 && finalPrice < 1000) {
+      finalPrice *= 1000;
+    }
+
+    if (!askAdminPrice && finalPrice <= 0) {
+      showToast('Harga harus lebih dari 0 atau aktifkan "Tanyakan Admin"', 'error');
       return;
     }
 
@@ -39,9 +52,10 @@ export const QuickPriceEditModal: React.FC = () => {
       const updatedProd: Product = {
         ...quickPriceEditProduct,
         askAdminPrice,
-        wholesalePrice: askAdminPrice ? 0 : wholesalePrice,
-        price: retailPrice || wholesalePrice,
-        retailPrice,
+        wholesalePrice: finalPrice,
+        price: finalPrice,
+        retailPrice: finalPrice,
+        allowRetail,
         inStock,
       };
 
@@ -105,13 +119,13 @@ export const QuickPriceEditModal: React.FC = () => {
           </div>
 
           {!askAdminPrice && (
-            <>
-              {/* Wholesale Price Field */}
+            <div className="space-y-3">
+              {/* Single Price Field */}
               <div className="p-3.5 bg-slate-50 rounded-xl border-2 border-slate-300">
                 <label className="block font-black text-slate-950 mb-1">
-                  Harga Grosir Lapak (Rp) <span className="text-red-600">*</span>
+                  Harga (Rp) <span className="text-red-600">*</span>
                 </label>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1">
                   <span className="text-slate-900 font-bold">Rp</span>
                   <input
                     type="number"
@@ -119,9 +133,13 @@ export const QuickPriceEditModal: React.FC = () => {
                     required
                     value={wholesalePrice}
                     onChange={(e) => setWholesalePrice(Number(e.target.value))}
+                    onBlur={handlePriceBlur}
                     className="w-full px-3 py-2 bg-white border border-slate-400 rounded-lg font-mono font-black text-base text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
+                <span className="text-[11px] text-slate-800 font-bold block mb-2">
+                  Ketik angka (misal <strong className="text-slate-950">88</strong> otomatis menjadi <strong className="text-slate-950">88.000</strong>)
+                </span>
                 {/* Quick Adjustment Buttons */}
                 <div className="flex flex-wrap gap-1.5">
                   <button
@@ -162,23 +180,22 @@ export const QuickPriceEditModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Retail Price Field */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border-2 border-slate-300">
-                <label className="block font-black text-slate-950 mb-1">
-                  Harga Eceran Patokan per {quickPriceEditProduct.unit}
-                </label>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-slate-900 font-bold">Rp</span>
-                  <input
-                    type="number"
-                    step="500"
-                    value={retailPrice}
-                    onChange={(e) => setRetailPrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-400 rounded-lg font-mono font-black text-base text-emerald-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
+              {/* Bisa Eceran Checkbox */}
+              <div className="flex items-center justify-between p-3.5 bg-amber-50 rounded-xl border border-amber-300">
+                <div>
+                  <span className="font-black text-slate-950 block">Opsi: Bisa Eceran</span>
+                  <span className="text-[11px] text-slate-800 font-bold">
+                    Centang jika pembeli boleh membeli satuan tanpa minimal grosir
+                  </span>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={allowRetail}
+                  onChange={(e) => setAllowRetail(e.target.checked)}
+                  className="w-5 h-5 rounded text-amber-600 accent-amber-600 cursor-pointer"
+                />
               </div>
-            </>
+            </div>
           )}
 
           {/* Stock Status Toggle */}
@@ -214,8 +231,15 @@ export const QuickPriceEditModal: React.FC = () => {
                   Tanyakan Admin
                 </span>
               ) : (
-                <div className="text-base font-black font-mono text-slate-950">
-                  {formatRupiah(wholesalePrice)}
+                <div className="flex items-center gap-2 justify-end">
+                  <div className="text-base font-black font-mono text-slate-950">
+                    {formatRupiah(wholesalePrice > 0 && wholesalePrice < 1000 ? wholesalePrice * 1000 : wholesalePrice)}
+                  </div>
+                  {allowRetail && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded font-black">
+                      Bisa Eceran
+                    </span>
+                  )}
                 </div>
               )}
             </div>

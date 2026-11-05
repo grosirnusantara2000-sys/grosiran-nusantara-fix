@@ -77,6 +77,26 @@ export function unmarkProductAsDeleted(productId: string) {
   } catch {}
 }
 
+// Auto-normalize prices (misal angka 88 otomatis jadi 88.000) & bersihkan varian kosong
+export function normalizeProductPrices(item: Product): Product {
+  if (item.wholesalePrice && item.wholesalePrice > 0 && item.wholesalePrice < 1000) {
+    item.wholesalePrice = item.wholesalePrice * 1000;
+  }
+  if (item.price && item.price > 0 && item.price < 1000) {
+    item.price = item.price * 1000;
+  }
+  if (item.retailPrice && item.retailPrice > 0 && item.retailPrice < 1000) {
+    item.retailPrice = item.retailPrice * 1000;
+  }
+  if (item.colors) {
+    item.colors = item.colors.filter((c) => c && typeof c === 'string' && c.trim().length > 0);
+  }
+  if (item.sizes) {
+    item.sizes = item.sizes.filter((s) => s && typeof s === 'string' && s.trim().length > 0);
+  }
+  return item;
+}
+
 // Fetch Products from Firestore
 export async function fetchProducts(): Promise<Product[]> {
   const path = 'products';
@@ -87,10 +107,10 @@ export async function fetchProducts(): Promise<Product[]> {
     if (!snap.empty) {
       const list: Product[] = [];
       snap.forEach((docItem) => {
-        const item = docItem.data() as Product;
+        let item = docItem.data() as Product;
         if (deletedIds.has(item.id)) return; // Skip deleted products
 
-        // Strictly normalize outletId & image URLs
+        // Strictly normalize outletId, image URLs & prices
         if (!item.outletId) {
           item.outletId = item.id.startsWith('prod-ta') ? 'TANAH_ABANG' : 'AUR_KUNING';
         }
@@ -100,6 +120,7 @@ export async function fetchProducts(): Promise<Product[]> {
         if (item.images && Array.isArray(item.images)) {
           item.images = item.images.map((img) => getSafeImageUrl(img));
         }
+        item = normalizeProductPrices(item);
         list.push(item);
       });
 
@@ -154,7 +175,7 @@ export function subscribeToProducts(onData: (products: Product[]) => void): () =
         if (!snap.empty) {
           const list: Product[] = [];
           snap.forEach((docItem) => {
-            const item = docItem.data() as Product;
+            let item = docItem.data() as Product;
             if (deletedIds.has(item.id)) return;
 
             if (!item.outletId) {
@@ -166,6 +187,7 @@ export function subscribeToProducts(onData: (products: Product[]) => void): () =
             if (item.images && Array.isArray(item.images)) {
               item.images = item.images.map((img) => getSafeImageUrl(img));
             }
+            item = normalizeProductPrices(item);
             list.push(item);
           });
 
@@ -776,9 +798,18 @@ export async function quickUpdateProductPrice(
   productId: string,
   newWholesalePrice: number,
   newJokiFee?: number,
-  newRetailPrice?: number
+  newRetailPrice?: number,
+  allowRetail?: boolean
 ): Promise<void> {
   const path = 'products';
+  // Otomatis tambahkan nominal ribuan (000), misal 88 menjadi 88000
+  if (newWholesalePrice > 0 && newWholesalePrice < 1000) {
+    newWholesalePrice = newWholesalePrice * 1000;
+  }
+  if (newRetailPrice !== undefined && newRetailPrice > 0 && newRetailPrice < 1000) {
+    newRetailPrice = newRetailPrice * 1000;
+  }
+
   // Update local cache
   try {
     const local = localStorage.getItem('aur_kuning_local_products');
@@ -788,8 +819,10 @@ export async function quickUpdateProductPrice(
       list[idx] = {
         ...list[idx],
         wholesalePrice: newWholesalePrice,
+        price: newRetailPrice || newWholesalePrice,
         ...(newJokiFee !== undefined ? { jokiFee: newJokiFee } : {}),
-        ...(newRetailPrice !== undefined ? { price: newRetailPrice } : {}),
+        ...(newRetailPrice !== undefined ? { retailPrice: newRetailPrice } : {}),
+        ...(allowRetail !== undefined ? { allowRetail } : {}),
       };
       localStorage.setItem('aur_kuning_local_products', JSON.stringify(list));
     }
@@ -797,12 +830,36 @@ export async function quickUpdateProductPrice(
 
   // Update Firestore using setDoc with merge so it creates or updates without throwing
   try {
-    const updates: Record<string, any> = { wholesalePrice: newWholesalePrice };
+    const updates: Record<string, any> = {
+      wholesalePrice: newWholesalePrice,
+      price: newRetailPrice || newWholesalePrice,
+    };
     if (newJokiFee !== undefined) updates.jokiFee = newJokiFee;
-    if (newRetailPrice !== undefined) updates.price = newRetailPrice;
+    if (newRetailPrice !== undefined) updates.retailPrice = newRetailPrice;
+    if (allowRetail !== undefined) updates.allowRetail = allowRetail;
     await setDoc(doc(db, path, productId), updates, { merge: true });
   } catch (error) {
     console.warn('Firestore quick price update warning:', error);
+  }
+}
+
+// Quick toggle retail availability (Bisa Eceran)
+export async function toggleProductRetail(productId: string, allowRetail: boolean): Promise<void> {
+  const path = 'products';
+  try {
+    const local = localStorage.getItem('aur_kuning_local_products');
+    let list: Product[] = local ? JSON.parse(local) : [...INITIAL_PRODUCTS];
+    const idx = list.findIndex((p) => p.id === productId);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], allowRetail };
+      localStorage.setItem('aur_kuning_local_products', JSON.stringify(list));
+    }
+  } catch (e) {}
+
+  try {
+    await setDoc(doc(db, path, productId), { allowRetail }, { merge: true });
+  } catch (error) {
+    console.warn('Firestore toggle retail warning:', error);
   }
 }
 

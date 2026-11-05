@@ -53,6 +53,7 @@ export interface Product {
   minOrder: number; // Minimal order (misal 3 pcs, 6 pcs, 12 pcs/1 lusin, 20 pcs/1 kodi)
   unit: string; // 'pcs' | 'lusin' | 'kodi' | 'seri'
   retailPrice?: number; // Harga eceran
+  allowRetail?: boolean; // Centang admin jika produk bisa dibeli eceran
   jokiFee?: number; // Opsional backwards compatibility (0)
   imageUrl: string;
   images?: string[]; // Multiple photos gallery

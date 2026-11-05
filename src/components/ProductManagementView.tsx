@@ -7,6 +7,7 @@ import {
   removeMultipleProducts,
   quickUpdateProductPrice,
   toggleProductStock,
+  toggleProductRetail,
   addCategory,
 } from '../services/dataService';
 import { Product, Category } from '../types';
@@ -70,8 +71,8 @@ export const ProductManagementView: React.FC = () => {
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
 
-  // Inline price editing: { [productId]: { wholesalePrice: number, retailPrice: number } }
-  const [inlinePriceMap, setInlinePriceMap] = useState<Record<string, { wholesalePrice: number; retailPrice: number }>>({});
+  // Inline price & retail toggle editing: { [productId]: { price: number, allowRetail: boolean } }
+  const [inlinePriceMap, setInlinePriceMap] = useState<Record<string, { price: number; allowRetail: boolean }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -81,10 +82,12 @@ export const ProductManagementView: React.FC = () => {
       setProducts(prods);
       setCategories(cats);
 
-      // Initialize inline price map
-      const initialMap: Record<string, { wholesalePrice: number; retailPrice: number }> = {};
+      // Initialize inline price map with automatic thousand (000) check
+      const initialMap: Record<string, { price: number; allowRetail: boolean }> = {};
       prods.forEach((p) => {
-        initialMap[p.id] = { wholesalePrice: p.wholesalePrice, retailPrice: p.retailPrice || p.price };
+        let priceVal = p.wholesalePrice || p.price || 0;
+        if (priceVal > 0 && priceVal < 1000) priceVal = priceVal * 1000;
+        initialMap[p.id] = { price: priceVal, allowRetail: !!p.allowRetail };
       });
       setInlinePriceMap(initialMap);
     } catch (err) {
@@ -125,7 +128,12 @@ export const ProductManagementView: React.FC = () => {
     });
   }, [products, searchQuery, selectedCategory, stockFilter]);
 
-  const formatRupiah = (num: number) => 'Rp ' + (num || 0).toLocaleString('id-ID');
+  const formatRupiah = (num: number) => {
+    let n = num || 0;
+    // Penulisan harga otomatis ditambahkan nominal ribuan (000), misal angka 88 menjadi 88.000
+    if (n > 0 && n < 1000) n = n * 1000;
+    return 'Rp ' + n.toLocaleString('id-ID');
+  };
 
   // Selection handlers
   const handleToggleSelectProduct = (productId: string) => {
@@ -224,25 +232,74 @@ export const ProductManagementView: React.FC = () => {
     }
   };
 
-  // Inline price change
-  const handlePriceChange = (productId: string, field: 'wholesalePrice' | 'retailPrice', val: number) => {
+  // Inline single price change
+  const handlePriceChange = (productId: string, val: number) => {
     setInlinePriceMap((prev) => ({
       ...prev,
       [productId]: {
-        ...(prev[productId] || { wholesalePrice: 0, retailPrice: 0 }),
-        [field]: val,
+        ...(prev[productId] || { price: 0, allowRetail: false }),
+        price: val,
       },
     }));
   };
 
+  // Penulisan harga otomatis ditambahkan nominal ribuan (000), misal angka 88 menjadi 88.000
+  const handlePriceBlur = (productId: string) => {
+    setInlinePriceMap((prev) => {
+      const current = prev[productId];
+      if (!current) return prev;
+      let p = current.price;
+      if (p > 0 && p < 1000) {
+        p = p * 1000;
+      }
+      return {
+        ...prev,
+        [productId]: {
+          ...current,
+          price: p,
+        },
+      };
+    });
+  };
+
+  // Opsi centang produk yang bisa eceran
+  const handleToggleRetail = async (prod: Product) => {
+    const nextState = !prod.allowRetail;
+    setProducts((prev) => prev.map((p) => (p.id === prod.id ? { ...p, allowRetail: nextState } : p)));
+    setInlinePriceMap((prev) => ({
+      ...prev,
+      [prod.id]: {
+        ...(prev[prod.id] || { price: prod.wholesalePrice || 0, allowRetail: false }),
+        allowRetail: nextState,
+      },
+    }));
+    try {
+      await toggleProductRetail(prod.id, nextState);
+      showToast(
+        nextState
+          ? `Produk "${prod.name}" sekarang dicentang: Bisa Beli Eceran`
+          : `Produk "${prod.name}" diset: Khusus Grosir`,
+        'success'
+      );
+      triggerRefresh();
+    } catch (err) {
+      showToast('Gagal mengubah opsi eceran', 'error');
+    }
+  };
+
   const handleSaveInlinePrice = async (prod: Product) => {
-    const prices = inlinePriceMap[prod.id];
-    if (!prices) return;
+    const itemData = inlinePriceMap[prod.id];
+    if (!itemData) return;
+    let finalPrice = itemData.price;
+    // Penulisan harga otomatis ditambahkan nominal ribuan (000)
+    if (finalPrice > 0 && finalPrice < 1000) {
+      finalPrice = finalPrice * 1000;
+    }
 
     setSavingId(prod.id);
     try {
-      await quickUpdateProductPrice(prod.id, prices.wholesalePrice, 0, prices.retailPrice);
-      showToast(`Harga "${prod.name}" berhasil diubah!`, 'success');
+      await quickUpdateProductPrice(prod.id, finalPrice, 0, finalPrice, itemData.allowRetail);
+      showToast(`Harga "${prod.name}" berhasil disimpan (${formatRupiah(finalPrice)})!`, 'success');
       triggerRefresh();
     } catch (err: any) {
       showToast('Gagal update harga: ' + err.message, 'error');
@@ -467,9 +524,8 @@ export const ProductManagementView: React.FC = () => {
                   <th className="py-3.5 px-3">Foto</th>
                   <th className="py-3.5 px-4">Nama Produk & Varian</th>
                   <th className="py-3.5 px-4">Kategori & Min.</th>
-                  <th className="py-3.5 px-4 w-44">Harga Grosir Lapak</th>
-                  <th className="py-3.5 px-4 w-36">Harga Eceran</th>
-                  <th className="py-3.5 px-4">Harga Sisi Pembeli</th>
+                  <th className="py-3.5 px-4 w-48">Harga</th>
+                  <th className="py-3.5 px-4 text-center w-36">Bisa Eceran</th>
                   <th className="py-3.5 px-4 text-center">Status Stok</th>
                   <th className="py-3.5 px-4 text-center">Aksi</th>
                 </tr>
@@ -477,15 +533,15 @@ export const ProductManagementView: React.FC = () => {
               <tbody className="divide-y divide-slate-200 text-slate-950 font-medium">
                 {filteredProducts.map((prod) => {
                   const isSelected = selectedProductIds.has(prod.id);
-                  const currentPrices = inlinePriceMap[prod.id] || {
-                    wholesalePrice: prod.wholesalePrice,
-                    retailPrice: prod.retailPrice || prod.price,
+                  const itemData = inlinePriceMap[prod.id] || {
+                    price: prod.wholesalePrice || prod.price || 0,
+                    allowRetail: !!prod.allowRetail,
                   };
                   const isModified =
-                    currentPrices.wholesalePrice !== prod.wholesalePrice ||
-                    currentPrices.retailPrice !== (prod.retailPrice || prod.price);
+                    itemData.price !== (prod.wholesalePrice || prod.price) ||
+                    itemData.allowRetail !== !!prod.allowRetail;
                   const isSavingThis = savingId === prod.id;
-                  const isAskAdmin = !!prod.askAdminPrice || prod.wholesalePrice <= 0;
+                  const isAskAdmin = !!prod.askAdminPrice || (prod.wholesalePrice <= 0 && prod.price <= 0);
 
                   return (
                     <tr
@@ -528,18 +584,26 @@ export const ProductManagementView: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Name & Variants */}
+                      {/* Name & Variants: Kosongkan jika variasi tidak diisi/dipilih */}
                       <td className="py-3.5 px-4 max-w-64">
                         <div className="font-black text-slate-950 text-xs line-clamp-2 leading-snug">
                           {prod.name}
                         </div>
                         <div className="text-[11px] text-slate-800 font-bold mt-0.5 flex flex-wrap gap-1 items-center">
                           <span>Satuan: <b className="text-slate-950">{prod.unit}</b></span>
-                          {prod.colors && prod.colors.length > 0 && (
+                          {/* Variasi Seri Warna (hanya tampil jika ada isi) */}
+                          {prod.colors && prod.colors.length > 0 && prod.colors.some((c) => c && c.trim()) && (
                             <span className="bg-slate-200 px-1.5 py-0.2 rounded text-[10px] text-slate-950 font-bold">
-                              {prod.colors.slice(0, 2).join(', ')}
+                              {prod.colors.filter((c) => c && c.trim()).slice(0, 2).join(', ')}
                             </span>
                           )}
+                          {/* Variasi Ukuran (hanya tampil jika ada isi) */}
+                          {prod.sizes && prod.sizes.length > 0 && prod.sizes.some((s) => s && s.trim()) && (
+                            <span className="bg-slate-200 px-1.5 py-0.2 rounded text-[10px] text-slate-950 font-bold">
+                              {prod.sizes.filter((s) => s && s.trim()).slice(0, 2).join(', ')}
+                            </span>
+                          )}
+                          {/* Variasi Kustom (hanya tampil jika ada isi) */}
                           {prod.customVariants && prod.customVariants.length > 0 && (
                             <span className="bg-amber-200 border border-amber-300 px-1.5 py-0.2 rounded text-[10px] text-amber-950 font-black">
                               +{prod.customVariants.length} Varian
@@ -556,54 +620,59 @@ export const ProductManagementView: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Inline Wholesale Price Edit */}
+                      {/* Single Kolom "Harga" dengan auto penulisan ribuan (000) */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-900 font-bold text-[11px]">Rp</span>
-                          <input
-                            type="number"
-                            step="500"
-                            value={currentPrices.wholesalePrice}
-                            onChange={(e) =>
-                              handlePriceChange(prod.id, 'wholesalePrice', Number(e.target.value))
-                            }
-                            className={`w-28 px-2 py-1 bg-white border-2 rounded-lg font-mono font-black text-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                              isModified ? 'border-amber-500 bg-amber-50' : 'border-slate-300'
-                            }`}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Inline Retail Price Edit */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-900 font-bold text-[11px]">Rp</span>
-                          <input
-                            type="number"
-                            step="500"
-                            value={currentPrices.retailPrice}
-                            onChange={(e) =>
-                              handlePriceChange(prod.id, 'retailPrice', Number(e.target.value))
-                            }
-                            className={`w-24 px-2 py-1 bg-white border-2 rounded-lg font-mono font-black text-emerald-900 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                              isModified ? 'border-amber-500 bg-amber-50' : 'border-slate-300'
-                            }`}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Customer-side Price View */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
                         {isAskAdmin ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-200 border border-amber-400 text-slate-950 rounded-lg font-black text-[11px]">
                             <MessageCircle className="w-3 h-3 text-amber-800" />
                             Tanyakan Admin
                           </span>
                         ) : (
-                          <span className="font-mono font-black text-slate-950 text-xs">
-                            {formatRupiah(currentPrices.wholesalePrice)}
-                          </span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-900 font-bold text-[11px]">Rp</span>
+                              <input
+                                type="number"
+                                step="1000"
+                                value={itemData.price}
+                                onChange={(e) =>
+                                  handlePriceChange(prod.id, Number(e.target.value))
+                                }
+                                onBlur={() => handlePriceBlur(prod.id)}
+                                className={`w-32 px-2 py-1 bg-white border-2 rounded-lg font-mono font-black text-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                                  isModified ? 'border-amber-500 bg-amber-50' : 'border-slate-300'
+                                }`}
+                              />
+                            </div>
+                            <div className="text-[11px] font-mono font-black text-emerald-900">
+                              {formatRupiah(itemData.price)}
+                            </div>
+                          </div>
                         )}
+                      </td>
+
+                      {/* Opsi Centang Produk yang Bisa Eceran */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <label
+                          className="inline-flex items-center gap-1.5 cursor-pointer select-none"
+                          title="Centang untuk mengizinkan pembelian satuan/eceran"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!prod.allowRetail}
+                            onChange={() => handleToggleRetail(prod)}
+                            className="w-4 h-4 text-amber-600 rounded accent-amber-600 cursor-pointer"
+                          />
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                              prod.allowRetail
+                                ? 'bg-emerald-100 text-emerald-950 border-emerald-400'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                            }`}
+                          >
+                            {prod.allowRetail ? 'Bisa Ecer' : 'Grosir'}
+                          </span>
+                        </label>
                       </td>
 
                       {/* Stock Toggle */}
