@@ -79,7 +79,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [newCatName, setNewCatName] = useState('');
   const [isSavingCat, setIsSavingCat] = useState(false);
 
-  const [estimatedShoppingDay, setEstimatedShoppingDay] = useState('Hari Pasar (Selasa & Jumat)');
+  const [estimatedShoppingDay, setEstimatedShoppingDay] = useState('Buka Setiap Hari');
   const [featured, setFeatured] = useState(false);
   const [bestSeller, setBestSeller] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -114,7 +114,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setColors((productToEdit.colors || []).filter((c) => c && c.trim()));
       setSizes((productToEdit.sizes || []).filter((s) => s && s.trim()));
       setCustomVariants(productToEdit.customVariants || []);
-      setEstimatedShoppingDay(productToEdit.estimatedShoppingDay || 'Hari Pasar');
+      setEstimatedShoppingDay(productToEdit.estimatedShoppingDay || 'Buka Setiap Hari');
       setFeatured(!!productToEdit.featured);
       setBestSeller(!!productToEdit.bestSeller);
     } else {
@@ -133,7 +133,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setColors([]);
       setSizes([]);
       setCustomVariants([]);
-      setEstimatedShoppingDay('Hari Pasar (Selasa & Jumat)');
+      setEstimatedShoppingDay('Buka Setiap Hari');
       setFeatured(false);
       setBestSeller(false);
     }

@@ -128,6 +128,8 @@ export const AdminDashboard: React.FC = () => {
   const [editPaymentStatus, setEditPaymentStatus] = useState<PaymentStatus>('Lunas');
   const [editTrackingNumber, setEditTrackingNumber] = useState('');
   const [editTrackingLink, setEditTrackingLink] = useState('');
+  const [editShippingCost, setEditShippingCost] = useState<number | string>(0);
+  const [editCourier, setEditCourier] = useState('');
 
   // Request Offer Modal State
   const [selectedRequestForOffer, setSelectedRequestForOffer] = useState<ProductRequest | null>(null);
@@ -196,31 +198,46 @@ export const AdminDashboard: React.FC = () => {
     setIsReceiptModalOpen(true);
   };
 
-  // Handle Order Status Update
+  // Handle Order Status & Manual Shipping Update
   const handleSaveOrderStatus = async () => {
     if (!selectedOrderForEdit) return;
 
     try {
+      let numericShipping = typeof editShippingCost === 'string'
+        ? parseFloat(editShippingCost.replace(/[^0-9]/g, '')) || 0
+        : Number(editShippingCost) || 0;
+
+      // Auto-thousands: if admin types small number like 50, treat as 50.000
+      if (numericShipping > 0 && numericShipping < 1000) {
+        numericShipping = numericShipping * 1000;
+      }
+
+      const calculatedTotal = (selectedOrderForEdit.subtotal || 0) + numericShipping;
+      const courierText = editCourier.trim() || 'Pengiriman Manual / Dikonfirmasi Admin';
+
       await updateOrderDetails(selectedOrderForEdit.id, {
         orderStatus: editOrderStatus,
         paymentStatus: editPaymentStatus,
         trackingNumber: editTrackingNumber.trim(),
         trackingLink: editTrackingLink.trim(),
+        shippingCost: numericShipping,
+        courier: courierText,
+        totalAmount: calculatedTotal,
       });
 
       await recordActivityLog(
-        'Update Status Pesanan',
+        'Update Status & Ongkir Pesanan',
         'order',
-        `Invoice ${selectedOrderForEdit.invoiceNumber}: Status ${editOrderStatus}, Pembayaran ${editPaymentStatus}.`,
+        `Invoice ${selectedOrderForEdit.invoiceNumber}: Ongkir Rp${numericShipping.toLocaleString('id-ID')}, Total Rp${calculatedTotal.toLocaleString('id-ID')}, Status ${editOrderStatus}.`,
         'success'
       );
 
-      showToast('Status pesanan berhasil diperbarui!', 'success');
+      showToast('Status pesanan & ongkir manual berhasil diperbarui!', 'success');
       setSelectedOrderForEdit(null);
       loadData();
       triggerRefresh();
     } catch (err: any) {
-      showToast('Gagal update status: ' + err.message, 'error');
+      showToast('Gagal update status & ongkir: ' + err.message, 'error');
     }
   };
 
@@ -943,8 +960,14 @@ export const AdminDashboard: React.FC = () => {
                             </td>
 
                             <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
-                              <div className="font-bold text-slate-900 text-sm">
+                              <div className="font-black text-slate-950 text-sm">
                                 Rp{ord.totalAmount.toLocaleString('id-ID')}
+                              </div>
+                              <div className="text-[10px] text-slate-600 font-semibold">
+                                Subtotal: Rp{(ord.subtotal || 0).toLocaleString('id-ID')}
+                              </div>
+                              <div className="text-[10px] font-bold text-amber-900">
+                                Ongkir: {ord.shippingCost > 0 ? `+Rp${ord.shippingCost.toLocaleString('id-ID')}` : 'Belum Ada (Rp 0)'}
                               </div>
                               {ord.trackingLink && (
                                 <a
@@ -997,7 +1020,7 @@ export const AdminDashboard: React.FC = () => {
                                   <span>WA Struk</span>
                                 </button>
 
-                                {/* Button C: Edit Status & Tracking */}
+                                {/* Button C: Edit Status, Ongkir & Tracking */}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1006,11 +1029,14 @@ export const AdminDashboard: React.FC = () => {
                                     setEditPaymentStatus(ord.paymentStatus);
                                     setEditTrackingNumber(ord.trackingNumber || '');
                                     setEditTrackingLink(ord.trackingLink || '');
+                                    setEditShippingCost(ord.shippingCost || 0);
+                                    setEditCourier(ord.courier || 'Pengiriman Manual / Dikonfirmasi Admin');
                                   }}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition-colors cursor-pointer"
-                                  title="Edit Status Pesanan & Resi / Link Lacak"
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Atur Biaya Pengiriman Manual & Status"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
+                                  <span>Edit / Ongkir</span>
                                 </button>
                               </div>
                             </td>
@@ -1152,104 +1178,200 @@ export const AdminDashboard: React.FC = () => {
       />
 
       {/* ======================================================== */}
-      {/* MODAL 2: EDIT ORDER STATUS & TRACKING NUMBER */}
+      {/* MODAL 2: EDIT ORDER STATUS, MANUAL SHIPPING & TRACKING */}
       {/* ======================================================== */}
-      {selectedOrderForEdit && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900 text-sm">
-                Perbarui Pesanan #{selectedOrderForEdit.invoiceNumber}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSelectedOrderForEdit(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {selectedOrderForEdit && (() => {
+        const parsedShipping = typeof editShippingCost === 'string'
+          ? parseFloat(editShippingCost.replace(/[^0-9]/g, '')) || 0
+          : Number(editShippingCost) || 0;
+        const previewShipping = (parsedShipping > 0 && parsedShipping < 1000) ? parsedShipping * 1000 : parsedShipping;
+        const previewGrandTotal = (selectedOrderForEdit.subtotal || 0) + previewShipping;
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Status Pembayaran</label>
-                <select
-                  value={editPaymentStatus}
-                  onChange={(e) => setEditPaymentStatus(e.target.value as PaymentStatus)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
-                  <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
-                  <option value="Lunas">Lunas</option>
-                  <option value="Dibatalkan">Dibatalkan</option>
-                </select>
-              </div>
+        const handleSendWaInvoiceUpdate = () => {
+          const rawWa = selectedOrderForEdit.customerWhatsapp.replace(/\D/g, '');
+          const cleanWa = rawWa.startsWith('0') ? '62' + rawWa.substring(1) : rawWa;
+          const msg = `Halo Kak *${selectedOrderForEdit.customerName}*,\n\nBerikut pembaruan tagihan pesanan Anda di *Grosir Nusantara*:\n- *No. Invoice*: #${selectedOrderForEdit.invoiceNumber}\n- *Subtotal Barang*: Rp ${(selectedOrderForEdit.subtotal || 0).toLocaleString('id-ID')}\n- *Biaya Pengiriman*: Rp ${previewShipping.toLocaleString('id-ID')} (${editCourier || 'Disepakati'})\n- *TOTAL TAGIHAN*: *Rp ${previewGrandTotal.toLocaleString('id-ID')}*\n- *Status Pembayaran*: ${editPaymentStatus}\n- *Status Pesanan*: ${editOrderStatus}\n\nSilakan transfer pembayaran sesuai total tagihan ke rekening resmi kami atau scan QRIS Toko. Terima kasih!`;
+          window.open(`https://wa.me/${cleanWa}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Status Pengerjaan Pesanan</label>
-                <select
-                  value={editOrderStatus}
-                  onChange={(e) => setEditOrderStatus(e.target.value as OrderStatus)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                >
-                  <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
-                  <option value="Pembayaran Dikonfirmasi">Pembayaran Dikonfirmasi</option>
-                  <option value="Pesanan Diproses">Pesanan Diproses</option>
-                  <option value="Barang Sedang Dibelikan">Barang Sedang Dibelikan</option>
-                  <option value="Barang Sedang Dikemas">Barang Sedang Dikemas</option>
-                  <option value="Pesanan Dikirim">Pesanan Dikirim</option>
-                  <option value="Selesai">Selesai</option>
-                  <option value="Dibatalkan">Dibatalkan</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Nomor Resi Pengiriman</label>
-                <input
-                  type="text"
-                  value={editTrackingNumber}
-                  onChange={(e) => setEditTrackingNumber(e.target.value)}
-                  placeholder="Contoh: INDAH-BKT-8912347"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  Link / Tautan Pelacakan Ekspedisi untuk Pembeli
-                </label>
-                <input
-                  type="url"
-                  value={editTrackingLink}
-                  onChange={(e) => setEditTrackingLink(e.target.value)}
-                  placeholder="Contoh: https://cekresi.com/?noresi=... atau link ekspedisi kargo"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono text-xs"
-                />
-                <span className="text-[10.5px] text-slate-500 mt-1 block">
-                  Pelanggan dapat langsung menekan tombol tautan ini saat melacak pesanannya di halaman Lacak Pesanan.
-                </span>
-              </div>
-
-              <div className="pt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveOrderStatus}
-                  className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
-                >
-                  Simpan Perubahan
-                </button>
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 my-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
+                <div>
+                  <h3 className="font-black text-slate-950 text-base">
+                    Kelola Pesanan #{selectedOrderForEdit.invoiceNumber}
+                  </h3>
+                  <p className="text-[11px] text-slate-600 font-semibold">
+                    Pelanggan: {selectedOrderForEdit.customerName} ({selectedOrderForEdit.customerWhatsapp})
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setSelectedOrderForEdit(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
+                  className="text-slate-400 hover:text-slate-600 p-1"
                 >
-                  Batal
+                  <X className="w-5 h-5" />
                 </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* Section A: Biaya Pengiriman Manual */}
+                <div className="p-3.5 bg-amber-50 rounded-xl border-2 border-amber-300 space-y-3">
+                  <div className="flex items-center gap-1.5 font-black text-slate-950 text-xs">
+                    <Truck className="w-4 h-4 text-amber-800" />
+                    <span>Fitur Input Biaya Pengiriman Manual</span>
+                  </div>
+                  <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                    Toko tidak melayani pengiriman langsung. Masukkan biaya pengiriman yang telah disepakati bersama pembeli via WhatsApp.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-900 block mb-1">
+                        Biaya Pengiriman Manual (Rp)
+                      </label>
+                      <input
+                        type="text"
+                        value={editShippingCost}
+                        onChange={(e) => setEditShippingCost(e.target.value)}
+                        placeholder="Contoh: 50000 atau 50"
+                        className="w-full px-3 py-2 border-2 border-amber-400 rounded-lg bg-white font-mono font-bold text-slate-950"
+                      />
+                      <span className="text-[10px] text-slate-600 block mt-0.5">
+                        Ketik 50 otomatis jadi 50.000
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-900 block mb-1">
+                        Keterangan Pengiriman
+                      </label>
+                      <input
+                        type="text"
+                        value={editCourier}
+                        onChange={(e) => setEditCourier(e.target.value)}
+                        placeholder="Misal: Disepakati WA / Ambil Sendiri"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-950"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Recalculation Breakdown */}
+                  <div className="pt-2 border-t border-amber-200/80 space-y-1 text-slate-900">
+                    <div className="flex justify-between text-[11px]">
+                      <span>Subtotal Barang:</span>
+                      <span className="font-mono font-bold">
+                        Rp {(selectedOrderForEdit.subtotal || 0).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-amber-900">
+                      <span>Biaya Pengiriman Manual:</span>
+                      <span className="font-mono font-bold">
+                        + Rp {previewShipping.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black text-slate-950 pt-1 border-t border-amber-300">
+                      <span>Total Tagihan Baru:</span>
+                      <span className="font-mono text-sm text-emerald-800">
+                        Rp {previewGrandTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section B: Status Pembayaran & Pengerjaan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-900 block mb-1">Status Pembayaran</label>
+                    <select
+                      value={editPaymentStatus}
+                      onChange={(e) => setEditPaymentStatus(e.target.value as PaymentStatus)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900"
+                    >
+                      <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
+                      <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+                      <option value="Lunas">Lunas</option>
+                      <option value="Dibatalkan">Dibatalkan</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-900 block mb-1">Status Pengerjaan Pesanan</label>
+                    <select
+                      value={editOrderStatus}
+                      onChange={(e) => setEditOrderStatus(e.target.value as OrderStatus)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900"
+                    >
+                      <option value="Menunggu Pembayaran">Menunggu Pembayaran</option>
+                      <option value="Pembayaran Dikonfirmasi">Pembayaran Dikonfirmasi</option>
+                      <option value="Pesanan Diproses">Pesanan Diproses</option>
+                      <option value="Barang Sedang Dibelikan">Barang Sedang Dibelikan</option>
+                      <option value="Barang Sedang Dikemas">Barang Sedang Dikemas</option>
+                      <option value="Pesanan Dikirim">Pesanan Dikirim</option>
+                      <option value="Selesai">Selesai</option>
+                      <option value="Dibatalkan">Dibatalkan</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Section C: Resi & Tautan Lacak */}
+                <div>
+                  <label className="font-bold text-slate-900 block mb-1">Nomor Resi / Surat Jalan</label>
+                  <input
+                    type="text"
+                    value={editTrackingNumber}
+                    onChange={(e) => setEditTrackingNumber(e.target.value)}
+                    placeholder="Contoh: RESI-8912347 / SJ-001"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-900 block mb-1">
+                    Link / Tautan Pelacakan untuk Pembeli
+                  </label>
+                  <input
+                    type="url"
+                    value={editTrackingLink}
+                    onChange={(e) => setEditTrackingLink(e.target.value)}
+                    placeholder="Contoh: https://cekresi.com/?noresi=..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono text-xs text-slate-900"
+                  />
+                </div>
+
+                {/* WhatsApp Notification Button */}
+                <button
+                  type="button"
+                  onClick={handleSendWaInvoiceUpdate}
+                  className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Kirim Rincian Tagihan + Ongkir ke WA Pembeli</span>
+                </button>
+
+                {/* Action Buttons */}
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveOrderStatus}
+                    className="flex-1 py-3 bg-cyan-700 hover:bg-cyan-800 text-white font-black rounded-xl text-xs transition-colors cursor-pointer shadow-sm"
+                  >
+                    Simpan Perubahan &amp; Ongkir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForEdit(null)}
+                    className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* MODAL 3: REQUEST OFFER MODAL */}

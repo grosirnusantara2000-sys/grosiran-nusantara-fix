@@ -110,12 +110,12 @@ export const AboutSection: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center mb-3">
                 <Store className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 mb-1">Jadwal Hari Pasar</h3>
-              <p className="text-slate-600 leading-relaxed">
+              <h3 className="font-bold text-slate-900 mb-1">Jadwal Operasional Outlet</h3>
+              <p className="text-slate-600 leading-relaxed font-semibold">
                 {storeSettings?.marketDays || BUSINESS_INFO.marketDays}
               </p>
               <p className="text-slate-500 text-[11px] mt-1">
-                (Toko tetap melayani belanja setiap hari kerja)
+                (Kedua outlet buka setiap hari melayani order grosir &amp; kirim kargo)
               </p>
             </div>
 

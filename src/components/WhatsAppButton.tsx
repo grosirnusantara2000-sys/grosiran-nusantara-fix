@@ -22,7 +22,7 @@ export const WhatsAppButton: React.FC = () => {
       msg += `saya ingin request dicarikan barang khusus di sentra ${activeOutletInfo.name}.`;
     } else if (topic === 'ongkir') {
       targetPhone = adminWhatsapp;
-      msg += `saya mau tanya tarif ongkir ekspedisi kargo dari ${activeOutletInfo.city} ke kota saya.`;
+      msg += `saya mau konfirmasi mengenai sistem pengiriman atau pengambilan pesanan dari ${activeOutletInfo.city} ke kota saya.`;
     } else if (topic === 'order') {
       targetPhone = orderWhatsapp;
       msg += `saya mau konfirmasi status pesanan / invoice saya di ${activeOutletInfo.shortName}.`;
@@ -70,7 +70,7 @@ export const WhatsAppButton: React.FC = () => {
               onClick={() => startChat('ongkir')}
               className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 font-semibold text-slate-800 text-[11px] transition-colors"
             >
-              📦 Cek Ongkir Kargo ke Kota Saya
+              🚚 Konfirmasi Pengiriman &amp; Pengambilan
             </button>
             <button
               onClick={() => startChat('order')}

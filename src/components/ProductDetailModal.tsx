@@ -129,6 +129,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
     window.open(url, '_blank');
   };
 
+  // Dedicated button: "Konfirmasi Pengiriman ke Admin via WhatsApp"
+  const handleAskShippingCostWhatsApp = () => {
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'tanya_admin', activeOutletInfo.whatsappNumber);
+    const text = `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}),\nSaya tertarik dengan produk:\n*${product.name}* (ID: ${product.id})\nJumlah: ${quantity} ${product.unit}\n\nSaya ingin menanyakan ketersediaan dan konfirmasi opsi pengiriman/pengambilan barang ini ke kota saya. Mohon informasinya. Terima kasih!`;
+    const url = getWhatsappChatUrl(effectiveWa, text);
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl my-6 flex flex-col md:flex-row relative max-h-[92vh] border-2 border-slate-300">
@@ -303,6 +311,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   <span>* Minimal pembelian grosir: <strong className="text-slate-950 font-mono font-black">{product.minOrder} {product.unit}</strong></span>
                 )}
               </div>
+            </div>
+
+            {/* Notice Pengiriman Dikonfirmasi ke Admin */}
+            <div className="mt-3 p-3 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-2">
+              <div className="flex items-start gap-2">
+                <Truck className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-950 font-bold leading-relaxed">
+                  <strong>Toko tidak melayani pengiriman langsung.</strong> Pengiriman atau pengambilan barang wajib dikonfirmasi terlebih dahulu ke admin toko via WhatsApp.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAskShippingCostWhatsApp}
+                className="w-full py-2 px-3 text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl flex items-center justify-center gap-1.5 border border-amber-500 shadow-2xs cursor-pointer transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
+                <span>Konfirmasi Pengiriman ke Admin via WhatsApp</span>
+              </button>
             </div>
 
             {/* Colors Variant Selector - Only rendered if colors are entered */}

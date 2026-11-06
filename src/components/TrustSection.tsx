@@ -17,7 +17,7 @@ export const TrustSection: React.FC = () => {
   const { setCurrentView } = useApp();
 
   const handleWhatsAppCS = () => {
-    const text = `Halo Admin Grosir Nusantara, saya ingin konsultasi mengenai sistem belanja grosir tangan pertama dan ekspedisi kargo.`;
+    const text = `Halo Admin Grosir Nusantara, saya ingin konsultasi mengenai sistem belanja grosir tangan pertama dan konfirmasi pesanan.`;
     const url = `https://wa.me/62${BUSINESS_INFO.whatsapp.replace(/^0/, '')}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -48,7 +48,7 @@ export const TrustSection: React.FC = () => {
               1. Transparansi Harga 100%
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Harga barang ditampilkan jujur langsung sesuai harga modal lapak grosir dan ongkos kirim kargo terjangkau. Tidak ada biaya siluman.
+              Harga barang ditampilkan jujur langsung sesuai harga modal lapak grosir tangan pertama. Tidak ada biaya siluman.
             </p>
           </div>
 
@@ -84,10 +84,10 @@ export const TrustSection: React.FC = () => {
               <Truck className="w-6 h-6 text-orange-400" />
             </div>
             <h3 className="text-base font-bold text-slate-900 mb-2">
-              4. Tracking Resi & Kargo Murah
+              4. Tracking Invoice &amp; Resi Pengiriman
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Bekerjasama dengan kargo terpercaya (Indah Cargo, Baraka, Dakota, JTR) dengan tarif grosir kiloan murah dan no. resi yang dapat dilacak online.
+              Pengiriman pesanan dikonfirmasi bersama admin sesuai kebutuhan Anda, dengan nomor nota / resi yang dapat dilacak secara mandiri.
             </p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export const TrustSection: React.FC = () => {
               Mau tanya harga lapak grosir atau butuh bantuan request barang?
             </h4>
             <p className="text-xs text-slate-300 mt-1">
-              Admin kami standby di Bukittinggi untuk menjawab pertanyaan seputar jenis bahan, harga partai besar, dan rute kargo tercepat ke kota Anda.
+              Admin kami standby setiap hari untuk menjawab pertanyaan seputar jenis bahan, harga partai besar, dan informasi pesanan Anda.
             </p>
           </div>
 

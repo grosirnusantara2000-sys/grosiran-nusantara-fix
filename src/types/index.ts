@@ -256,6 +256,7 @@ export interface StoreSettings {
   showAddressOnReceipt?: boolean;
   showWhatsappOnReceipt?: boolean;
   showQrisOnReceipt?: boolean;
+  qrisImageUrl?: string;
   showFooterOnReceipt?: boolean;
   thermalPaperWidth?: '58mm' | '80mm';
   adminPin?: string;

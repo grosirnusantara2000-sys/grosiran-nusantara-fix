@@ -304,7 +304,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     inStock: true,
     colors: ['Putih Bersih', 'Broken White', 'Mocca Lembut', 'Dusty Pink'],
     sizes: ['Jumbo Dewasa'],
-    estimatedShoppingDay: 'Tiap Hari Pasar (Selasa & Jumat prioritas)',
+    estimatedShoppingDay: 'Buka Setiap Hari (Siap Kirim)',
     createdAt: '2026-10-15',
     featured: true,
     bestSeller: true,
@@ -388,7 +388,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     inStock: true,
     colors: ['Hitam Motif Emas', 'Navy Motif Silver', 'Cokelat Kayu Manis'],
     sizes: ['M-L', 'XL-XXL'],
-    estimatedShoppingDay: 'Hari Pasar Utama (Selasa & Jumat)',
+    estimatedShoppingDay: 'Buka Setiap Hari (Siap Kirim)',
     createdAt: '2026-10-25',
     featured: true,
     bestSeller: false,
@@ -511,8 +511,8 @@ export const INITIAL_ARTICLES: Article[] = [
     author: 'Tim Sourcing Grosir Nusantara',
     content: `Pasar Aur Kuning Bukittinggi merupakan salah satu pasar grosir tekstil dan pakaian jadi terbesar di Pulau Sumatera. Pedagang dari Riau, Jambi, Sumatera Utara, Bengkulu, hingga Pulau Jawa secara rutin berbelanja di sini.
 
-### 1. Kenali Jadwal Hari Pasar
-Meskipun toko-toko buka setiap hari, hari pasar resmi Aur Kuning adalah hari **Selasa** dan **Jumat**. Pada dua hari ini, para produsen konveksi dari berbagai pelosok Sumatera Barat (seperti Ampek Angkek, Baso, Padang Panjang) turun langsung membawa stok terbaru dengan harga partai besar paling murah.
+### 1. Jadwal Operasional Toko: Buka Setiap Hari
+Kedua outlet sentra kami di Pasar Aur Kuning (Bukittinggi) dan Pasar Tanah Abang (Jakarta) kini **Buka Setiap Hari** melayani transaksi pembelian grosir, konfirmasi stok lapak, serta pengiriman paket kargo ke seluruh kota di Indonesia setiap hari.
 
 ### 2. Pahami Istilah Satuan Grosir
 - **Kodi**: 20 buah/potong. Sering dipakai untuk jilbab, daster, dan mukena.
@@ -647,7 +647,7 @@ export const OUTLETS_DATA: Record<import('../types').OutletId, import('../types'
     address: 'Kawasan Pasar Grosir Aur Kuning, Blok B No. 14, Kel. Tarok Dipo, Kec. Guguk Panjang, Kota Bukittinggi, Sumatera Barat 26138',
     whatsappNumber: '081267891011',
     email: 'aurkuning@grosirnusantara.com',
-    marketDays: 'Hari Pasar Utama: Selasa & Jumat (07.30 - 17.00 WIB)',
+    marketDays: 'Buka Setiap Hari (07.30 - 17.00 WIB)',
     operationalHours: 'Senin - Minggu (08.00 - 21.00 WIB)',
     landmark: 'Rumah Gadang',
     themeColor: '#d97706',
@@ -662,7 +662,7 @@ export const BUSINESS_INFO = {
   whatsappDisplay: '+62 812-9876-5432',
   email: 'halo@grosirnusantara.com',
   address: 'Kawasan Grosir Tanah Abang Blok A & B (Jakarta) dan Pasar Aur Kuning Blok B (Bukittinggi)',
-  marketDays: 'Tanah Abang: Setiap Hari | Aur Kuning: Hari Pasar Utama Selasa & Jumat',
+  marketDays: 'Tanah Abang & Aur Kuning: Buka Setiap Hari (08.00 - 17.00 WIB)',
   serviceDays: 'Layanan Belanja Grosir & Konsultasi Online: Senin - Minggu (08.00 - 21.00 WIB)',
 };
 
@@ -681,7 +681,7 @@ export const INITIAL_STORE_SETTINGS: StoreSettings = {
   whatsappGreetingRequest: 'Halo Admin Grosir Nusantara, saya ingin mengajukan pesanan khusus / request barang di sentra grosir.',
   email: 'halo@grosirnusantara.com',
   address: 'Jakarta: Pasar Tanah Abang Blok A-B | Bukittinggi: Pasar Aur Kuning Blok B',
-  marketDays: 'Tanah Abang: Setiap Hari | Aur Kuning: Selasa & Jumat',
+  marketDays: 'Tanah Abang & Aur Kuning: Buka Setiap Hari',
   operationalHours: 'Senin - Minggu (08.00 - 21.00 WIB)',
   googleSheetsWebhookUrl: '',
   googleSheetId: '',

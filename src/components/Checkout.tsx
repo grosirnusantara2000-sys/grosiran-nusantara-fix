@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { createOrder } from '../services/dataService';
-import { BUSINESS_INFO, COURIER_OPTIONS, BANK_ACCOUNTS } from '../data/initialData';
+import { BUSINESS_INFO, BANK_ACCOUNTS } from '../data/initialData';
 import { getWhatsappChatUrl, getEffectiveWhatsapp, formatWhatsappOrderInvoiceMessage } from '../utils/whatsapp';
 import { Order, OrderItem } from '../types';
 import {
@@ -32,34 +32,32 @@ export const Checkout: React.FC = () => {
   const [city, setCity] = useState('');
   const [province, setProvince] = useState('Sumatera Barat');
   const [postalCode, setPostalCode] = useState('');
-  const [shippingNotes, setShippingNotes] = useState('Mohon packing karung & lapis plastik anti air');
+  const [shippingNotes, setShippingNotes] = useState('Mohon konfirmasi biaya pengiriman manual via WA');
 
-  // Dynamic Couriers & Payment Methods from StoreSettings
-  const activeCouriers = (storeSettings.courierOptions && storeSettings.courierOptions.length > 0)
-    ? storeSettings.courierOptions.filter((c) => c.active !== false)
-    : COURIER_OPTIONS;
-
+  // Dynamic Payment Methods from StoreSettings
   const activeBankAccounts = (storeSettings.bankAccounts && storeSettings.bankAccounts.length > 0)
     ? storeSettings.bankAccounts.filter((b) => b.active !== false)
     : BANK_ACCOUNTS.map((b, i) => ({ id: 'bank-' + i, ...b, active: true }));
 
-  const [selectedCourierId, setSelectedCourierId] = useState(activeCouriers[0]?.id || 'indah-cargo');
   const [paymentMethod, setPaymentMethod] = useState(activeBankAccounts[0]?.bankName || 'Transfer BCA');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [copiedInvoice, setCopiedInvoice] = useState(false);
 
-  const selectedCourier = activeCouriers.find((c) => c.id === selectedCourierId) || activeCouriers[0] || COURIER_OPTIONS[0];
+  // Harga yang tercantum belum termasuk biaya pengiriman (ongkir dikonfirmasi manual ke admin)
+  const shippingCost = 0;
+  const grandTotal = cartSubtotal;
 
-  // Rough estimation: 1 order item package ~ 5kg minimum cargo
-  const totalWeightKg = Math.max(
-    selectedCourier.minWeight || 5,
-    Math.ceil(cart.reduce((sum, item) => sum + item.quantity * 0.35, 0))
-  );
-  const shippingCost = (selectedCourier.ratePerKg || 6500) * totalWeightKg;
-  const grandTotal = cartSubtotal + shippingCost;
+  const formatRupiah = (num: number) => 'Rp ' + (num || 0).toLocaleString('id-ID');
 
-  const formatRupiah = (num: number) => 'Rp ' + num.toLocaleString('id-ID');
+  const handleAskShippingCostWhatsApp = () => {
+    const effectiveWa = getEffectiveWhatsapp(storeSettings, 'tanya_admin', activeOutletInfo.whatsappNumber);
+    const destination = [city, province].filter(Boolean).join(', ') || 'kota saya';
+    const totalPcs = cart.reduce((sum, item) => sum + item.quantity, 0);
+    const message = `Halo Admin Grosir Nusantara (${activeOutletInfo.shortName}),\nSaya sedang di halaman checkout belanja Grosir Nusantara:\n- Total Item: ${totalPcs} pcs barang grosir\n- Subtotal Produk: ${formatRupiah(cartSubtotal)}\n- Alamat Tujuan Kirim: *${destination}*\n\nMohon informasi konfirmasi pengiriman / pengambilan barang serta perhitungan ongkir ke alamat saya. Terima kasih!`;
+    const url = getWhatsappChatUrl(effectiveWa, message);
+    window.open(url, '_blank');
+  };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,9 +113,9 @@ export const Checkout: React.FC = () => {
         items: orderItems,
         subtotal: cartSubtotal,
         jokiTotal: 0,
-        shippingCost,
+        shippingCost: 0,
         totalAmount: grandTotal,
-        courier: selectedCourier.name,
+        courier: 'Kargo / Ekspedisi (Ongkir Ditanggung Pembeli)',
         paymentMethod,
         notes: shippingNotes.trim() || '',
       });
@@ -189,21 +187,42 @@ export const Checkout: React.FC = () => {
               <span className="font-semibold text-slate-800 text-right max-w-xs">{createdOrder.shippingAddress.city}, {createdOrder.shippingAddress.province}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Ekspedisi:</span>
-              <span className="font-semibold text-slate-800">{createdOrder.courier}</span>
+              <span className="text-slate-500">Pengiriman:</span>
+              <span className="font-semibold text-slate-800 text-right">{createdOrder.courier || 'Dikonfirmasi ke Admin'}</span>
+            </div>
+            <div className="p-2.5 bg-amber-100/70 border border-amber-300 rounded-lg text-[11px] text-slate-950 font-bold leading-relaxed">
+              * <strong>Toko tidak melayani pengiriman langsung.</strong> Pengiriman atau pengambilan barang wajib dikonfirmasi ke admin dahulu via WhatsApp. Biaya ongkir ditambahkan secara manual oleh admin setelah disepakati.
             </div>
             <div className="flex justify-between pt-2 border-t border-slate-200 text-sm font-bold text-slate-900">
-              <span>Total Tagihan:</span>
+              <span>Total Tagihan Produk:</span>
               <span className="text-blue-900 font-mono-nums">{formatRupiah(createdOrder.totalAmount)}</span>
             </div>
           </div>
+
+          {/* QRIS Toko Display if uploaded */}
+          {storeSettings.qrisImageUrl && (
+            <div className="p-4 bg-emerald-50/70 rounded-xl border-2 border-emerald-400 text-center mb-4">
+              <div className="text-xs font-black text-slate-950 mb-1 flex items-center justify-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-emerald-700" />
+                <span>Scan QRIS Toko Resmi</span>
+              </div>
+              <p className="text-[11px] text-slate-700 mb-2 font-medium">
+                Bebas biaya admin · Mendukung BCA, Mandiri, BRI, BNI, GoPay, OVO, Dana, ShopeePay
+              </p>
+              <img
+                src={storeSettings.qrisImageUrl}
+                alt="QRIS Toko"
+                className="max-w-[210px] max-h-[210px] object-contain mx-auto rounded-lg border border-emerald-200 p-2 bg-white shadow-sm"
+              />
+            </div>
+          )}
 
           {/* Bank Instructions */}
           <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-left mb-6 text-xs text-amber-900">
             <div className="font-bold mb-1">Informasi Rekening Pembayaran ({createdOrder.paymentMethod}):</div>
             <p className="mb-2">Silakan transfer nominal pas ke salah satu rekening resmi kami:</p>
-            {BANK_ACCOUNTS.map((acc) => (
-              <div key={acc.bankName} className="font-mono-nums text-[11px] py-0.5">
+            {activeBankAccounts.map((acc) => (
+              <div key={acc.id || acc.bankName} className="font-mono-nums text-[11px] py-0.5">
                 • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder}
               </div>
             ))}
@@ -240,10 +259,10 @@ export const Checkout: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Form Checkout & Pengiriman
+            Form Checkout &amp; Pengiriman
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Lengkapi alamat pengiriman dan pilih ekspedisi kargo pilihan Anda untuk pengiriman langsung dari sentra grosir
+          <p className="text-xs sm:text-sm text-slate-600 mt-1 font-semibold">
+            Lengkapi alamat pengiriman Anda. <strong>Harga yang tercantum belum termasuk biaya ekspedisi pengiriman (ongkir ditanggung oleh pembeli).</strong>
           </p>
         </div>
 
@@ -254,7 +273,7 @@ export const Checkout: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
                 <span className="w-6 h-6 rounded-full bg-blue-900 text-white text-xs flex items-center justify-center">1</span>
-                <span>Data Pemesan & Kontak WhatsApp</span>
+                <span>Data Pemesan &amp; Kontak WhatsApp</span>
               </div>
 
               <div className="space-y-4 text-xs">
@@ -397,80 +416,149 @@ export const Checkout: React.FC = () => {
               </div>
             </div>
 
-            {/* Step 3: Courier Selection */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
-                <span className="w-6 h-6 rounded-full bg-blue-900 text-white text-xs flex items-center justify-center">3</span>
-                <span>Pilih Layanan Ekspedisi Kargo</span>
+            {/* Step 3: Ketentuan Pengiriman (Toko Tidak Melayani Pengiriman Langsung) */}
+            <div className="bg-white p-6 rounded-2xl border-2 border-amber-300 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950 pb-2 border-b border-amber-200">
+                <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">3</span>
+                <span>Ketentuan Pengiriman / Pengambilan Barang</span>
               </div>
 
-              <div className="space-y-2.5 text-xs">
-                {activeCouriers.map((c) => (
-                  <label
-                    key={c.id}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      selectedCourierId === c.id
-                        ? 'border-blue-900 bg-blue-50/50 shadow-2xs'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="courier"
-                        checked={selectedCourierId === c.id}
-                        onChange={() => setSelectedCourierId(c.id)}
-                        className="text-blue-900 focus:ring-blue-900"
-                      />
-                      <div>
-                        <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-[11px] text-slate-500">
-                          Estimasi sampai: {c.estimatedDays} · Min. {c.minWeight} kg {c.type ? `(${c.type})` : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right font-mono-nums font-bold text-slate-800">
-                      Rp {c.ratePerKg.toLocaleString('id-ID')}/kg
-                    </div>
-                  </label>
-                ))}
+              {/* Notice Banner */}
+              <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <Truck className="w-5 h-5 text-amber-800 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-slate-950 leading-snug">
+                      Toko tidak melayani pengiriman langsung. Pengiriman barang wajib dikonfirmasi ke admin dahulu.
+                    </h4>
+                    <p className="text-xs text-slate-800 font-bold leading-relaxed mt-1">
+                      Harga yang tercantum belum termasuk biaya pengiriman. Seluruh pengaturan kurir, kargo, atau pengambilan barang wajib disepakati bersama admin terlebih dahulu via WhatsApp. Biaya pengiriman manual akan ditambahkan oleh admin ke rincian pesanan.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive WhatsApp Button for Shipping Confirmation */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleAskShippingCostWhatsApp}
+                  className="w-full py-3 px-4 text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl flex items-center justify-center gap-2 border border-amber-500 shadow-sm cursor-pointer transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4 text-slate-950" />
+                  <span>Konfirmasi Pengiriman ke Admin via WhatsApp</span>
+                </button>
+                <p className="text-[11px] text-slate-700 text-center font-bold mt-1.5">
+                  Hubungi admin kami untuk menyepakati pengiriman dan biaya ongkir ke kota {city || 'tujuan Anda'}.
+                </p>
               </div>
             </div>
 
             {/* Step 4: Payment Method */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
                 <span className="w-6 h-6 rounded-full bg-blue-900 text-white text-xs flex items-center justify-center">4</span>
-                <span>Metode Pembayaran (Transfer Bank &amp; E-Wallet)</span>
+                <span>Metode Pembayaran (Transfer Bank, E-Wallet &amp; QRIS)</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                {activeBankAccounts.map((b) => (
-                  <label
-                    key={b.id || b.bankName}
-                    className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                      paymentMethod === b.bankName
-                        ? 'border-blue-900 bg-blue-50 text-blue-900 font-bold ring-2 ring-blue-900/20'
-                        : 'border-slate-200 text-slate-700 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value={b.bankName}
-                      checked={paymentMethod === b.bankName}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="sr-only"
+              {/* QRIS Toko Card if uploaded */}
+              {storeSettings.qrisImageUrl && (
+                <div className="p-4 bg-emerald-50 rounded-xl border-2 border-emerald-400 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="shrink-0 bg-white p-2 rounded-xl border border-emerald-300 shadow-xs">
+                    <img
+                      src={storeSettings.qrisImageUrl}
+                      alt="QRIS Toko"
+                      className="w-28 h-28 object-contain"
                     />
-                    <div>
-                      <div className="font-bold text-slate-900">{b.bankName}</div>
-                      <div className="font-mono text-[11px] text-slate-600 mt-0.5">{b.accountNumber}</div>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-black text-[10px] mb-1">
+                      <CreditCard className="w-3 h-3" />
+                      <span>QRIS TOKO RESMI TERSEDIA</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-2">
-                      a.n. {b.accountHolder}
-                    </div>
-                  </label>
-                ))}
+                    <h4 className="text-xs font-black text-slate-900">
+                      Scan QRIS Menggunakan Semua Aplikasi Bank &amp; E-Wallet
+                    </h4>
+                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                      Bisa scan lewat BCA Mobile, Livin Mandiri, BRImo, BNI Mobile, GoPay, OVO, Dana, ShopeePay. Tanpa biaya admin tambahan.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('QRIS Toko Resmi')}
+                      className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        paymentMethod === 'QRIS Toko Resmi'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-white border border-emerald-400 text-emerald-800 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {paymentMethod === 'QRIS Toko Resmi' ? '✓ Dipilih sebagai Metode Pembayaran' : 'Pilih Pembayaran via QRIS'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-2">
+                  Atau Pilih Transfer Rekening Bank / E-Wallet:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  {/* QRIS Option button in grid */}
+                  {storeSettings.qrisImageUrl && (
+                    <label
+                      className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                        paymentMethod === 'QRIS Toko Resmi'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold ring-2 ring-emerald-500/20'
+                          : 'border-slate-200 text-slate-700 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="QRIS Toko Resmi"
+                        checked={paymentMethod === 'QRIS Toko Resmi'}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="sr-only"
+                      />
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1">
+                          <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>QRIS Toko Resmi</span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 mt-0.5">Scan Barcode QRIS</div>
+                      </div>
+                      <div className="text-[10px] text-emerald-700 font-semibold mt-2">
+                        Semua Bank &amp; E-Wallet
+                      </div>
+                    </label>
+                  )}
+
+                  {activeBankAccounts.map((b) => (
+                    <label
+                      key={b.id || b.bankName}
+                      className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                        paymentMethod === b.bankName
+                          ? 'border-blue-900 bg-blue-50 text-blue-900 font-bold ring-2 ring-blue-900/20'
+                          : 'border-slate-200 text-slate-700 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={b.bankName}
+                        checked={paymentMethod === b.bankName}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="sr-only"
+                      />
+                      <div>
+                        <div className="font-bold text-slate-900">{b.bankName}</div>
+                        <div className="font-mono text-[11px] text-slate-600 mt-0.5">{b.accountNumber}</div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-2">
+                        a.n. {b.accountHolder}
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -509,17 +597,24 @@ export const Checkout: React.FC = () => {
               {/* Price Breakdown */}
               <div className="pt-3 border-t border-slate-200 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>Subtotal Barang Grosir:</span>
-                  <span className="font-mono-nums font-semibold text-slate-900">{formatRupiah(cartSubtotal)}</span>
+                  <span className="font-bold text-slate-800">Subtotal Barang Grosir:</span>
+                  <span className="font-mono-nums font-black text-slate-950">{formatRupiah(cartSubtotal)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Estimasi Ongkir ({totalWeightKg} kg):</span>
-                  <span className="font-mono-nums font-semibold text-slate-900">+{formatRupiah(shippingCost)}</span>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="font-bold text-slate-800">Biaya Ekspedisi / Ongkir:</span>
+                  <span className="font-mono-nums font-bold text-amber-950 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-[11px]">
+                    Ditanggung Pembeli
+                  </span>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 flex justify-between text-sm font-extrabold text-slate-900">
-                  <span>Total Tagihan:</span>
-                  <span className="font-mono-nums text-lg text-blue-900 font-extrabold">
+                {/* Clear Shipping Notice Banner */}
+                <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-[11px] text-slate-950 font-bold leading-snug">
+                  * <strong>Harga yang tercantum belum termasuk biaya ekspedisi pengiriman</strong> (ongkir ditanggung oleh pembeli).
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 flex justify-between text-sm font-black text-slate-950">
+                  <span>Total Tagihan Produk:</span>
+                  <span className="font-mono-nums text-lg text-slate-950 font-black">
                     {formatRupiah(grandTotal)}
                   </span>
                 </div>

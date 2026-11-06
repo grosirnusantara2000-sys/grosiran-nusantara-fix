@@ -162,9 +162,8 @@ export const CartDrawer: React.FC = () => {
               </div>
             </div>
 
-            <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Ongkir kargo dihitung pada tahap checkout sesuai kota tujuan.</span>
+            <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-[11px] text-slate-950 font-bold leading-snug">
+              * <strong>Toko tidak melayani pengiriman langsung.</strong> Pengiriman barang wajib dikonfirmasi ke admin dahulu.
             </div>
 
             <button

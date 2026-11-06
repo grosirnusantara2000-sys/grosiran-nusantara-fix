@@ -242,7 +242,7 @@ export const OutletSelectorModal: React.FC<OutletSelectorModalProps> = ({ forceO
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 shrink-0 text-slate-900" />
-                  <span>Hari Pasar Utama: Selasa &amp; Jumat (07.30 - 17.00 WIB)</span>
+                  <span>Buka Setiap Hari (07.30 - 17.00 WIB)</span>
                 </div>
               </div>
             </div>

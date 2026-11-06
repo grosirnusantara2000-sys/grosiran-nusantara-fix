@@ -138,6 +138,14 @@ export function formatWhatsappOrderInvoiceMessage(
     )
     .join('\n') || '-';
 
+  const shippingInfo = (order.shippingCost || 0) > 0
+    ? `*Ongkir Kargo (${order.courier}):* ${formatRupiah(order.shippingCost)}`
+    : `*Ongkir Kargo:* Ditanggung Pembeli (Belum Termasuk)`;
+
+  const totalTagihanText = (order.shippingCost || 0) > 0
+    ? `*TOTAL TAGIHAN:* ${formatRupiah(order.totalAmount)}`
+    : `*TOTAL TAGIHAN PRODUK:* ${formatRupiah(order.totalAmount)}\n_(Catatan: Harga belum termasuk biaya ekspedisi kargo, ongkir ditanggung oleh pembeli)_`;
+
   return `*NOTA RESMI PESANAN GROSIR NUSANTARA*
 *NO. INVOICE:* \`${order.invoiceNumber}\`
 --------------------------------------------
@@ -151,8 +159,8 @@ export function formatWhatsappOrderInvoiceMessage(
 ${itemsList}
 
 *Subtotal Belanja:* ${formatRupiah(order.subtotal)}
-*Ongkir Kargo (${order.courier}):* ${formatRupiah(order.shippingCost)}
-*TOTAL TAGIHAN:* ${formatRupiah(order.totalAmount)}
+${shippingInfo}
+${totalTagihanText}
 --------------------------------------------
 *Status Pesanan:* ${order.orderStatus}
 *Lacak Pesanan Mandiri:*

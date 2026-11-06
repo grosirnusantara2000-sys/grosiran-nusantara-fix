@@ -100,7 +100,7 @@ interface AppContextType {
 
   // Store Settings & Profile
   storeSettings: StoreSettings;
-  updateStoreSettings: (settings: StoreSettings) => Promise<void>;
+  updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>;
 
   // Notifications
   notifications: AppNotification[];
@@ -212,11 +212,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
-  const updateStoreSettings = async (newSettings: StoreSettings) => {
-    setStoreSettings(newSettings);
-    await apiSaveStoreSettings(newSettings);
+  const updateStoreSettings = async (newSettings: Partial<StoreSettings>) => {
+    const merged = { ...storeSettings, ...newSettings } as StoreSettings;
+    setStoreSettings(merged);
+    await apiSaveStoreSettings(merged);
     triggerRefresh();
-    showToast('Profil toko & nomor WhatsApp berhasil diperbarui untuk seluruh aplikasi!', 'success');
+    showToast('Pengaturan toko berhasil diperbarui!', 'success');
   };
 
   const markNotificationAsRead = async (id: string) => {

@@ -113,21 +113,16 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Ekspedisi & Logistik */}
+          {/* Ketentuan Pengiriman */}
           <div>
             <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">
-              Mitra Ekspedisi Kargo
+              Ketentuan Pengiriman
             </h4>
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-              Paket grosir dikirim menggunakan ekspedisi kargo khusus Bukittinggi dengan tarif murah per kilogram:
+              Toko kami tidak melayani pengiriman langsung. Segala pengambilan atau pengiriman barang wajib dikonfirmasi terlebih dahulu ke Admin via WhatsApp.
             </p>
-            <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-300">
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">Indah Cargo</span>
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">Baraka Sarana Tama</span>
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">Dakota Cargo</span>
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">JTR (JNE Trucking)</span>
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">J&T Cargo</span>
-              <span className="px-2 py-1 bg-slate-900 border border-slate-800 rounded">Pos Indonesia Kargo</span>
+            <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg text-[11px] text-amber-400 font-semibold">
+              Biaya pengiriman akan ditambahkan secara manual oleh admin setelah disepakati bersama.
             </div>
           </div>
 
@@ -137,7 +132,7 @@ export const Footer: React.FC = () => {
               Customer Support
             </h4>
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-              Hubungi layanan admin untuk konsultasi ketersediaan barang dan estimasi ongkir kargo:
+              Hubungi layanan admin untuk konfirmasi ketersediaan barang dan diskusi pengiriman:
             </p>
             <div className="space-y-2 text-xs">
               <a

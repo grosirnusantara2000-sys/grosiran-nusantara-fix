@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Article } from '../types';
 import { useApp } from '../context/AppContext';
 import { BookOpen, Calendar, Clock, ArrowRight, User, X } from 'lucide-react';
@@ -16,6 +16,11 @@ const ArticleCoverImage: React.FC<{
 }> = ({ src, alt, fallbackSrc, tag }) => {
   const [imgSrc, setImgSrc] = useState(src);
   const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    setImgSrc(src);
+    setHasFailed(false);
+  }, [src]);
 
   const handleError = () => {
     if (fallbackSrc && imgSrc !== fallbackSrc) {

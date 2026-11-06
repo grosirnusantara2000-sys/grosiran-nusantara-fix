@@ -84,8 +84,8 @@ export const Hero: React.FC = () => {
               <span>Nota Fisik Toko Transparan</span>
             </div>
             <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Ekspedisi Kargo Se-Indonesia</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Konfirmasi Pengiriman via Admin</span>
             </div>
           </div>
         </div>

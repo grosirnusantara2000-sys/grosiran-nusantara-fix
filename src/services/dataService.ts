@@ -946,6 +946,9 @@ export async function fetchStoreSettings(): Promise<StoreSettings> {
     const snap = await getDoc(doc(db, path, docId));
     if (snap.exists()) {
       const data = snap.data() as StoreSettings;
+      if (data.marketDays && (data.marketDays.includes('Selasa') || data.marketDays.includes('Jumat'))) {
+        data.marketDays = 'Tanah Abang & Aur Kuning: Buka Setiap Hari';
+      }
       try {
         localStorage.setItem('aur_kuning_store_settings', JSON.stringify(data));
       } catch (e) {}

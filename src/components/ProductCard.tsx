@@ -154,6 +154,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
                 {formatRupiah(product.wholesalePrice > 0 && product.wholesalePrice < 1000 ? product.wholesalePrice * 1000 : product.wholesalePrice)}
                 <span className="text-xs font-bold text-slate-700 font-sans"> /{product.unit}</span>
               </div>
+              <div className="text-[10px] text-slate-800 font-bold mt-0.5">
+                * Pengiriman dikonfirmasi ke admin dahulu
+              </div>
             </div>
           )}
 

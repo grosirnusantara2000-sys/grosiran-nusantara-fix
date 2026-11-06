@@ -261,7 +261,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                   <span>Rp{order.subtotal.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Ongkir ({order.courier || 'Ekspedisi'}):</span>
+                  <span>Biaya Kirim ({order.courier || 'Manual / Dikonfirmasi'}):</span>
                   <span>Rp{order.shippingCost.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between font-extrabold text-[12px] text-slate-900 pt-1 border-t border-slate-800">
@@ -302,32 +302,40 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                 )}
               </div>
 
-              {/* QR Code / Barcode simulation */}
+              {/* QR Code / Barcode simulation or Uploaded QRIS */}
               {storeSettings.showQrisOnReceipt && (
                 <div className="my-2 py-2 flex flex-col items-center justify-center border-y border-dashed border-slate-300 bg-slate-50/50">
-                  <div className="w-16 h-16 bg-white border border-slate-300 p-1 rounded flex items-center justify-center">
-                    {/* Simulated Clean QR Code Grid */}
-                    <div className="grid grid-cols-4 gap-0.5 w-full h-full p-0.5 bg-slate-100">
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-300"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-white"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-300"></div>
-                      <div className="bg-slate-300"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-300"></div>
-                      <div className="bg-slate-900"></div>
-                      <div className="bg-slate-900"></div>
+                  {storeSettings.qrisImageUrl ? (
+                    <img
+                      src={storeSettings.qrisImageUrl}
+                      alt="QRIS Toko Resmi"
+                      className="w-24 h-24 object-contain bg-white border border-slate-300 p-1 rounded"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-white border border-slate-300 p-1 rounded flex items-center justify-center">
+                      {/* Simulated Clean QR Code Grid */}
+                      <div className="grid grid-cols-4 gap-0.5 w-full h-full p-0.5 bg-slate-100">
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-300"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-white"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-300"></div>
+                        <div className="bg-slate-300"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-300"></div>
+                        <div className="bg-slate-900"></div>
+                        <div className="bg-slate-900"></div>
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-[8px] text-slate-500 mt-1 font-mono">
-                    Scan Struk / Lacak Invoice
+                  )}
+                  <span className="text-[8px] text-slate-600 mt-1 font-mono font-bold">
+                    Scan QRIS Pembayaran / Lacak Invoice
                   </span>
                 </div>
               )}

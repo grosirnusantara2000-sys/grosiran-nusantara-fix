@@ -1,34 +1,31 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { StoreSettings, CourierOption, BankAccount, OrderGuideItem } from '../types';
+import { BankAccount, OrderGuideItem } from '../types';
 import {
   KeyRound,
-  Truck,
   CreditCard,
   Video,
   Plus,
-  Edit2,
   Trash2,
   Check,
   X,
   Save,
-  AlertCircle,
   HelpCircle,
-  ShieldCheck,
   Eye,
   EyeOff,
   Image as ImageIcon,
-  ExternalLink,
   Upload,
   Lock,
+  QrCode,
+  Loader2,
 } from 'lucide-react';
-import { recordActivityLog, syncToGoogleSheets } from '../services/dataService';
+import { recordActivityLog } from '../services/dataService';
 import { compressImageFile } from '../utils/imageUtils';
 
 export const AdminCustomizationView: React.FC = () => {
   const { storeSettings, updateStoreSettings, showToast } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'pin' | 'courier' | 'payment' | 'guide'>('pin');
+  const [activeTab, setActiveTab] = useState<'pin' | 'payment' | 'guide'>('payment');
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ title: string; onConfirm: () => void } | null>(null);
 
   // PIN state
@@ -37,22 +34,6 @@ export const AdminCustomizationView: React.FC = () => {
   const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [isSavingPin, setIsSavingPin] = useState(false);
-
-  // Couriers state
-  const [couriers, setCouriers] = useState<CourierOption[]>(
-    storeSettings.courierOptions && storeSettings.courierOptions.length > 0
-      ? storeSettings.courierOptions
-      : [
-          { id: 'indah-cargo', name: 'Indah Cargo Logistik (Pilihan Utama Grosir)', type: 'Kargo Darat/Laut', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 6500, active: true },
-          { id: 'baraka-cargo', name: 'Baraka Sarana Tama Cargo', type: 'Kargo Darat/Laut', estimatedDays: '2-5 Hari', minWeight: 5, ratePerKg: 7000, active: true },
-          { id: 'dakota-cargo', name: 'Dakota Cargo', type: 'Kargo Darat', estimatedDays: '3-6 Hari', minWeight: 10, ratePerKg: 6000, active: true },
-          { id: 'jne-trucking', name: 'JNE Trucking (JTR)', type: 'Kargo Darat', estimatedDays: '3-5 Hari', minWeight: 10, ratePerKg: 8500, active: true },
-          { id: 'jnt-cargo', name: 'J&T Cargo', type: 'Kargo Kilat', estimatedDays: '2-4 Hari', minWeight: 5, ratePerKg: 8000, active: true },
-          { id: 'pos-kargo', name: 'Pos Indonesia Kargo', type: 'Kargo Pos', estimatedDays: '3-6 Hari', minWeight: 3, ratePerKg: 9000, active: true },
-        ]
-  );
-  const [editingCourier, setEditingCourier] = useState<CourierOption | null>(null);
-  const [isCourierModalOpen, setIsCourierModalOpen] = useState(false);
 
   // Bank accounts state
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(
@@ -63,11 +44,14 @@ export const AdminCustomizationView: React.FC = () => {
           { id: 'bank-mandiri', bankName: 'Bank Mandiri', accountNumber: '111-00-2983741-2', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'KCP Tanah Abang', active: true },
           { id: 'bank-bri', bankName: 'Bank BRI', accountNumber: '0058-01-089723-50-1', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'KCP Aur Kuning', active: true },
           { id: 'bank-nagari', bankName: 'Bank Nagari (Sumbar)', accountNumber: '1001-0210-98234-1', accountHolder: 'GROSIR NUSANTARA OFFICIAL', branch: 'Cabang Bukittinggi', active: true },
-          { id: 'qris-grosir', bankName: 'QRIS Nasional (Semua Bank / E-Wallet)', accountNumber: 'NMID: ID102003891823', accountHolder: 'GROSIR NUSANTARA', branch: 'Instant Scan', active: true },
         ]
   );
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+
+  // QRIS Image state
+  const [isUploadingQris, setIsUploadingQris] = useState(false);
+  const [isDraggingQris, setIsDraggingQris] = useState(false);
 
   // Order Guides state
   const [orderGuides, setOrderGuides] = useState<OrderGuideItem[]>(
@@ -85,10 +69,10 @@ export const AdminCustomizationView: React.FC = () => {
           },
           {
             id: 'guide-2',
-            title: 'Langkah 2: Checkout & Pilih Ekspedisi Kargo Hemat',
+            title: 'Langkah 2: Checkout & Konfirmasi Pengiriman dengan Admin',
             type: 'step',
             stepNumber: 2,
-            description: 'Tentukan alamat pengiriman Anda ke seluruh Indonesia. Pilih ekspedisi kargo rekanan grosir (Indah Cargo, Baraka, Dakota, JTR, dsb) untuk tarif partai besar termurah.',
+            description: 'Lengkapi alamat pengiriman Anda. Toko kami tidak melayani pengiriman langsung otomatis; pengiriman/pengambilan barang dikonfirmasi ke admin via WhatsApp untuk penentuan ongkir manual.',
             mediaUrl: '/assets/images/about_aur_kuning_packing_1793527996506.jpg',
             active: true,
           },
@@ -97,15 +81,15 @@ export const AdminCustomizationView: React.FC = () => {
             title: 'Langkah 3: Pembayaran & Konfirmasi WhatsApp Otomatis',
             type: 'step',
             stepNumber: 3,
-            description: 'Lakukan pembayaran via Transfer Bank (BCA, Mandiri, BRI, Bank Nagari) atau QRIS. Tombol WhatsApp kami akan otomatis terhubung ke admin resmi untuk verifikasi nota.',
+            description: 'Lakukan pembayaran via Transfer Bank (BCA, Mandiri, BRI, Bank Nagari) atau scan QRIS Toko. Tombol WhatsApp kami akan otomatis terhubung ke admin resmi untuk verifikasi nota.',
             active: true,
           },
           {
             id: 'guide-4',
-            title: 'Langkah 4: Foto Fisik Lapak, Packing Karung & Resi',
+            title: 'Langkah 4: Foto Fisik Lapak, Packing Karung & Pengiriman',
             type: 'step',
             stepNumber: 4,
-            description: 'Tim kami mendatangi lapak toko fisik, memotret nota asli, melakukan packing karung berisolasi anti air, dan mengirimkan nomor resi ekspedisi kargo.',
+            description: 'Tim kami mendatangi lapak toko fisik, memotret nota asli, melakukan packing karung rapi anti air, dan mengonfirmasi resi pengiriman kepada Anda.',
             active: true,
           },
         ]
@@ -116,7 +100,6 @@ export const AdminCustomizationView: React.FC = () => {
 
   // Keep synced with storeSettings
   React.useEffect(() => {
-    if (storeSettings.courierOptions) setCouriers(storeSettings.courierOptions);
     if (storeSettings.bankAccounts) setBankAccounts(storeSettings.bankAccounts);
     if (storeSettings.orderGuides) setOrderGuides(storeSettings.orderGuides);
   }, [storeSettings]);
@@ -143,233 +126,197 @@ export const AdminCustomizationView: React.FC = () => {
 
     setIsSavingPin(true);
     try {
-      const updated: StoreSettings = {
-        ...storeSettings,
+      await updateStoreSettings({
         adminPin: newPin.trim(),
-        updatedAt: new Date().toISOString(),
-      };
-      await updateStoreSettings(updated);
-      await recordActivityLog(
-        'Ubah PIN Keamanan Admin',
-        'auth',
-        'Owner memperbarui PIN akses masuk admin.',
-        'success'
-      );
+      });
+      await recordActivityLog('Ubah PIN Admin', 'auth', 'Berhasil memperbarui PIN akses panel admin', 'success');
       showToast('PIN Admin berhasil diperbarui!', 'success');
       setCurrentPinInput('');
       setNewPin('');
       setConfirmPin('');
     } catch (err: any) {
-      showToast('Gagal memperbarui PIN: ' + err.message, 'error');
+      showToast('Gagal mengubah PIN: ' + err.message, 'error');
     } finally {
       setIsSavingPin(false);
     }
   };
 
-  // Courier Actions
-  const handleSaveCourier = async (courier: CourierOption) => {
-    const updated = couriers.some((c) => c.id === courier.id)
-      ? couriers.map((c) => (c.id === courier.id ? courier : c))
-      : [...couriers, courier];
-
-    setCouriers(updated);
-    setIsCourierModalOpen(false);
-    setEditingCourier(null);
-
+  // QRIS Upload Handler
+  const handleUploadQrisFile = async (file: File) => {
+    if (!file) return;
+    setIsUploadingQris(true);
     try {
+      showToast('Mengompresi dan memproses foto QRIS...', 'info');
+      const compressed = await compressImageFile(file, 1000, 1000, 0.85);
       await updateStoreSettings({
-        ...storeSettings,
-        courierOptions: updated,
-        updatedAt: new Date().toISOString(),
+        qrisImageUrl: compressed,
+        showQrisOnReceipt: true,
       });
-      await recordActivityLog('Kelola Ekspedisi', 'system', `Menyimpan ekspedisi: ${courier.name}`, 'success');
-      showToast(`Ekspedisi "${courier.name}" berhasil disimpan!`, 'success');
+      await recordActivityLog('Upload QRIS Toko', 'profile', 'Berhasil memperbarui foto barcode QRIS pembayaran toko', 'success');
+      showToast('Foto QRIS toko berhasil diunggah dan disimpan!', 'success');
     } catch (err: any) {
-      showToast('Gagal menyimpan ekspedisi: ' + err.message, 'error');
+      showToast('Gagal mengunggah foto QRIS: ' + err.message, 'error');
+    } finally {
+      setIsUploadingQris(false);
     }
   };
 
-  const executeDeleteCourier = async (id: string) => {
-    const target = couriers.find((c) => c.id === id);
-    if (!target) return;
-
-    const updated = couriers.filter((c) => c.id !== id);
-    setCouriers(updated);
+  // QRIS Delete Handler
+  const handleDeleteQris = async () => {
     try {
       await updateStoreSettings({
-        ...storeSettings,
-        courierOptions: updated,
-        updatedAt: new Date().toISOString(),
+        qrisImageUrl: '',
       });
-      showToast(`Ekspedisi "${target.name}" telah dihapus!`, 'info');
+      await recordActivityLog('Hapus QRIS Toko', 'profile', 'Menghapus foto QRIS toko', 'info');
+      showToast('Foto QRIS berhasil dihapus.', 'info');
     } catch (err: any) {
-      showToast('Gagal menghapus ekspedisi', 'error');
+      showToast('Gagal menghapus foto QRIS: ' + err.message, 'error');
     }
   };
 
-  const handleDeleteCourier = (id: string) => {
-    const target = couriers.find((c) => c.id === id);
-    if (!target) return;
-    setDeleteConfirmItem({
-      title: `Hapus ekspedisi "${target.name}" dari pilihan pengiriman pelanggan?`,
-      onConfirm: () => executeDeleteCourier(id),
-    });
-  };
-
-  // Bank Accounts Actions
+  // Save Bank Account Handler (Add & Edit)
   const handleSaveBank = async (bank: BankAccount) => {
-    const updated = bankAccounts.some((b) => b.id === bank.id)
-      ? bankAccounts.map((b) => (b.id === bank.id ? bank : b))
-      : [...bankAccounts, bank];
+    if (!bank.bankName.trim() || !bank.accountNumber.trim() || !bank.accountHolder.trim()) {
+      showToast('Nama bank, nomor rekening, dan atas nama wajib diisi', 'error');
+      return;
+    }
 
-    setBankAccounts(updated);
-    setIsBankModalOpen(false);
-    setEditingBank(null);
+    const existingIndex = bankAccounts.findIndex((b) => b.id === bank.id);
+    let updated: BankAccount[];
+    if (existingIndex >= 0) {
+      updated = [...bankAccounts];
+      updated[existingIndex] = bank;
+    } else {
+      updated = [...bankAccounts, bank];
+    }
 
     try {
       await updateStoreSettings({
-        ...storeSettings,
         bankAccounts: updated,
-        updatedAt: new Date().toISOString(),
       });
-      await recordActivityLog('Kelola Rekening', 'system', `Menyimpan rekening: ${bank.bankName}`, 'success');
+      setBankAccounts(updated);
+      setIsBankModalOpen(false);
+      setEditingBank(null);
+      await recordActivityLog('Kelola Pembayaran', 'profile', `Menyimpan rekening: ${bank.bankName} - ${bank.accountNumber}`, 'success');
       showToast(`Metode pembayaran "${bank.bankName}" berhasil disimpan!`, 'success');
     } catch (err: any) {
-      showToast('Gagal menyimpan metode pembayaran: ' + err.message, 'error');
+      showToast('Gagal menyimpan rekening: ' + err.message, 'error');
     }
   };
 
-  const executeDeleteBank = async (id: string) => {
+  // Delete Bank Account
+  const handleDeleteBank = async (id: string) => {
     const target = bankAccounts.find((b) => b.id === id);
     if (!target) return;
 
     const updated = bankAccounts.filter((b) => b.id !== id);
-    setBankAccounts(updated);
     try {
       await updateStoreSettings({
-        ...storeSettings,
         bankAccounts: updated,
-        updatedAt: new Date().toISOString(),
       });
-      showToast(`Rekening "${target.bankName}" telah dihapus!`, 'info');
+      setBankAccounts(updated);
+      await recordActivityLog('Hapus Rekening', 'profile', `Menghapus rekening: ${target.bankName}`, 'info');
+      showToast(`Rekening "${target.bankName}" berhasil dihapus!`, 'info');
     } catch (err: any) {
-      showToast('Gagal menghapus rekening', 'error');
+      showToast('Gagal menghapus rekening: ' + err.message, 'error');
     }
   };
 
-  const handleDeleteBank = (id: string) => {
-    const target = bankAccounts.find((b) => b.id === id);
-    if (!target) return;
-    setDeleteConfirmItem({
-      title: `Hapus rekening "${target.bankName}" (${target.accountNumber})?`,
-      onConfirm: () => executeDeleteBank(id),
-    });
-  };
-
-  // Order Guides Actions
+  // Save Guide Item Handler
   const handleSaveGuide = async (guide: OrderGuideItem) => {
-    const updated = orderGuides.some((g) => g.id === guide.id)
-      ? orderGuides.map((g) => (g.id === guide.id ? guide : g))
-      : [...orderGuides, guide];
+    if (!guide.title.trim() || !guide.description?.trim()) {
+      showToast('Judul dan deskripsi panduan wajib diisi', 'error');
+      return;
+    }
 
-    setOrderGuides(updated);
-    setIsGuideModalOpen(false);
-    setEditingGuide(null);
+    const existingIndex = orderGuides.findIndex((g) => g.id === guide.id);
+    let updated: OrderGuideItem[];
+    if (existingIndex >= 0) {
+      updated = [...orderGuides];
+      updated[existingIndex] = guide;
+    } else {
+      updated = [...orderGuides, guide];
+    }
 
     try {
       await updateStoreSettings({
-        ...storeSettings,
         orderGuides: updated,
-        updatedAt: new Date().toISOString(),
       });
-      await recordActivityLog('Kelola Media Panduan', 'system', `Menyimpan panduan: ${guide.title}`, 'success');
-      showToast(`Panduan "${guide.title}" berhasil disimpan!`, 'success');
+      setOrderGuides(updated);
+      setIsGuideModalOpen(false);
+      setEditingGuide(null);
+      await recordActivityLog('Kelola Panduan', 'profile', `Menyimpan panduan order: ${guide.title}`, 'success');
+      showToast('Media panduan cara order berhasil disimpan!', 'success');
     } catch (err: any) {
       showToast('Gagal menyimpan panduan: ' + err.message, 'error');
     }
   };
 
-  const executeDeleteGuide = async (id: string) => {
+  // Delete Guide Item
+  const handleDeleteGuide = async (id: string) => {
     const target = orderGuides.find((g) => g.id === id);
     if (!target) return;
 
     const updated = orderGuides.filter((g) => g.id !== id);
-    setOrderGuides(updated);
     try {
       await updateStoreSettings({
-        ...storeSettings,
         orderGuides: updated,
-        updatedAt: new Date().toISOString(),
       });
-      showToast(`Panduan "${target.title}" telah dihapus!`, 'info');
+      setOrderGuides(updated);
+      await recordActivityLog('Hapus Panduan', 'profile', `Menghapus panduan: ${target.title}`, 'info');
+      showToast('Panduan berhasil dihapus!', 'info');
     } catch (err: any) {
-      showToast('Gagal menghapus panduan', 'error');
+      showToast('Gagal menghapus panduan: ' + err.message, 'error');
     }
   };
 
-  const handleDeleteGuide = (id: string) => {
-    const target = orderGuides.find((g) => g.id === id);
-    if (!target) return;
-    setDeleteConfirmItem({
-      title: `Hapus langkah panduan "${target.title}"?`,
-      onConfirm: () => executeDeleteGuide(id),
-    });
-  };
-
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-sm overflow-hidden text-slate-950 font-sans">
       {/* Header */}
-      <div className="p-5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-6 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-amber-500" />
-            <span>Pengaturan Kustomisasi Toko</span>
+          <div className="flex items-center gap-2 text-xs font-black text-amber-800 uppercase tracking-wider mb-1">
+            <Lock className="w-4 h-4 text-amber-600" />
+            <span>Pengaturan Tingkat Lanjut &amp; Custom Toko</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-950">
+            Kustomisasi Admin &amp; Pembayaran
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Ubah PIN keamanan, daftar ekspedisi kargo, rekening bank, dan media panduan cara belanja secara dinamis.
+          <p className="text-xs text-slate-700 font-bold mt-0.5">
+            Ubah PIN keamanan, edit metode pembayaran rekening bank, upload foto QRIS toko, dan media panduan cara belanja.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold">
+        {/* Tab Navigation (Ekspedisi Kargo Resmi Dihapuskan Sesuai Permintaan) */}
+        <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-black">
+          <button
+            type="button"
+            onClick={() => setActiveTab('payment')}
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'payment' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-700 hover:text-black'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-emerald-600" />
+            <span>Metode Bayar &amp; QRIS</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('pin')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'pin' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'pin' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-700 hover:text-black'
             }`}
           >
-            <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+            <KeyRound className="w-4 h-4 text-amber-600" />
             <span>PIN Admin</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('courier')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'courier' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Truck className="w-3.5 h-3.5 text-blue-600" />
-            <span>Ekspedisi Kargo</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('payment')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'payment' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Rekening / Bayar</span>
-          </button>
-          <button
-            type="button"
             onClick={() => setActiveTab('guide')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'guide' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'guide' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-700 hover:text-black'
             }`}
           >
-            <Video className="w-3.5 h-3.5 text-purple-600" />
+            <Video className="w-4 h-4 text-purple-600" />
             <span>Media Panduan</span>
           </button>
         </div>
@@ -380,18 +327,18 @@ export const AdminCustomizationView: React.FC = () => {
       {/* ======================================================== */}
       {activeTab === 'pin' && (
         <div className="p-6 max-w-xl">
-          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-900 leading-relaxed">
-              <strong className="block mb-1">Pengaturan Keamanan Akses Owner / Admin:</strong>
-              PIN ini digunakan setiap kali masuk ke menu Dashboard Admin, Profil Toko, POS Cetak Thermal, dan Sinkronisasi Sheets.
-              PIN aktif saat ini: <code className="bg-white px-2 py-0.5 rounded font-mono font-bold text-slate-900 border border-amber-200">{storeSettings.adminPin || '1234'}</code>
+          <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3">
+            <Lock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-950 leading-relaxed font-bold">
+              <strong className="block mb-1 text-sm font-black text-slate-950">Pengaturan Keamanan Akses Owner / Admin:</strong>
+              PIN ini digunakan setiap kali masuk ke menu Dashboard Admin, Profil Toko, POS Cetak Thermal, dan Manajemen Produk.
+              PIN aktif saat ini: <code className="bg-white px-2 py-0.5 rounded font-mono font-black text-slate-950 border border-amber-300">{storeSettings.adminPin || '1234'}</code>
             </div>
           </div>
 
-          <form onSubmit={handleSavePin} className="space-y-4 text-xs">
+          <form onSubmit={handleSavePin} className="space-y-4 text-xs font-bold">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
+              <label className="font-black text-slate-950 block mb-1">
                 PIN Admin Saat Ini <span className="text-red-500">*</span>
               </label>
               <input
@@ -400,12 +347,12 @@ export const AdminCustomizationView: React.FC = () => {
                 value={currentPinInput}
                 onChange={(e) => setCurrentPinInput(e.target.value)}
                 placeholder="Masukkan PIN yang berlaku saat ini"
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-mono text-sm font-black text-slate-950 focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
+              <label className="font-black text-slate-950 block mb-1">
                 PIN Admin Baru <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -414,13 +361,13 @@ export const AdminCustomizationView: React.FC = () => {
                   required
                   value={newPin}
                   onChange={(e) => setNewPin(e.target.value)}
-                  placeholder="Minimal 4 angka (contoh: 8899)"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white font-mono text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  placeholder="Ketik minimal 4 angka/karakter baru"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-mono text-sm font-black text-slate-950 focus:ring-2 focus:ring-amber-500 focus:outline-none pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPin(!showPin)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-black cursor-pointer"
                 >
                   {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -428,8 +375,8 @@ export const AdminCustomizationView: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
-                Ulangi PIN Admin Baru <span className="text-red-500">*</span>
+              <label className="font-black text-slate-950 block mb-1">
+                Konfirmasi PIN Admin Baru <span className="text-red-500">*</span>
               </label>
               <input
                 type={showPin ? 'text' : 'password'}
@@ -437,7 +384,7 @@ export const AdminCustomizationView: React.FC = () => {
                 value={confirmPin}
                 onChange={(e) => setConfirmPin(e.target.value)}
                 placeholder="Ketik ulang PIN baru untuk verifikasi"
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-mono text-sm font-black text-slate-950 focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
             </div>
 
@@ -445,10 +392,10 @@ export const AdminCustomizationView: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSavingPin}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="py-3 px-6 bg-slate-950 hover:bg-black text-white font-black rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-colors disabled:opacity-50"
               >
-                <Save className="w-4 h-4" />
-                <span>{isSavingPin ? 'Menyimpan PIN...' : 'Simpan PIN Admin Baru'}</span>
+                <Save className="w-4 h-4 text-amber-400" />
+                <span>{isSavingPin ? 'Menyimpan...' : 'Simpan PIN Admin Baru'}</span>
               </button>
             </div>
           </form>
@@ -456,175 +403,220 @@ export const AdminCustomizationView: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* TAB 2: MITRA EKSPEDISI KARGO */}
-      {/* ======================================================== */}
-      {activeTab === 'courier' && (
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Daftar Mitra Ekspedisi Kargo</h3>
-              <p className="text-xs text-slate-500">Tarif dan ekspedisi ini otomatis tampil saat pelanggan checkout belanja.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingCourier({
-                  id: `courier-${Date.now()}`,
-                  name: '',
-                  type: 'Kargo Darat/Laut',
-                  ratePerKg: 6500,
-                  minWeight: 5,
-                  estimatedDays: '2-4 Hari',
-                  notes: '',
-                  active: true,
-                });
-                setIsCourierModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah Ekspedisi</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4">Nama Ekspedisi</th>
-                  <th className="py-3 px-4">Jenis</th>
-                  <th className="py-3 px-4">Tarif / Kg</th>
-                  <th className="py-3 px-4">Min. Berat</th>
-                  <th className="py-3 px-4">Estimasi</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {couriers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50/60">
-                    <td className="py-3 px-4 font-bold text-slate-900">{c.name}</td>
-                    <td className="py-3 px-4 text-slate-600">{c.type}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-blue-900">Rp {c.ratePerKg.toLocaleString('id-ID')}</td>
-                    <td className="py-3 px-4 font-mono">{c.minWeight} kg</td>
-                    <td className="py-3 px-4 text-slate-600">{c.estimatedDays}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${c.active !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-150 text-slate-600'}`}>
-                        {c.active !== false ? 'Aktif' : 'Non-aktif'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingCourier(c);
-                            setIsCourierModalOpen(true);
-                          }}
-                          className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-blue-900 rounded-lg cursor-pointer"
-                          title="Edit Ekspedisi"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCourier(c.id)}
-                          className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer"
-                          title="Hapus Ekspedisi"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 3: REKENING & METODE PEMBAYARAN */}
+      {/* TAB 2: METODE PEMBAYARAN & UPLOAD QRIS TOKO */}
       {/* ======================================================== */}
       {activeTab === 'payment' && (
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Daftar Rekening Bank &amp; E-Wallet</h3>
-              <p className="text-xs text-slate-500">Pilihan pembayaran yang tersedia bagi pelanggan saat menyelesaikan pesanan.</p>
+        <div className="p-6 space-y-8">
+          
+          {/* BAGIAN 1: UPLOAD FOTO QRIS TOKO */}
+          <div className="p-5 bg-emerald-50/60 border-2 border-emerald-300 rounded-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <QrCode className="w-5 h-5 text-emerald-800" />
+                  <h3 className="text-sm font-black text-slate-950">Foto Barcode QRIS Pembayaran Toko</h3>
+                </div>
+                <p className="text-xs text-slate-800 font-bold mt-0.5">
+                  Unggah gambar barcode QRIS resmi toko Anda. Foto ini otomatis tampil di halaman checkout pembeli dan bukti nota digital.
+                </p>
+              </div>
+              {storeSettings.qrisImageUrl && (
+                <button
+                  type="button"
+                  onClick={handleDeleteQris}
+                  className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300 rounded-xl text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-700" />
+                  <span>Hapus QRIS</span>
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingBank({
-                  id: `bank-${Date.now()}`,
-                  bankName: '',
-                  accountNumber: '',
-                  accountHolder: 'GROSIR NUSANTARA',
-                  branch: 'Kantor Cabang',
-                  active: true,
-                });
-                setIsBankModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah Rekening</span>
-            </button>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {bankAccounts.map((b) => (
-              <div key={b.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all relative">
-                <div className="flex items-start justify-between">
-                  <div className="font-bold text-sm text-slate-900">{b.bankName}</div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${b.active !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
-                    {b.active !== false ? 'Aktif' : 'Non-aktif'}
-                  </span>
-                </div>
-                <div className="mt-2 font-mono font-bold text-blue-900 text-base tracking-wider">
-                  {b.accountNumber}
-                </div>
-                <div className="text-xs text-slate-600 font-semibold mt-0.5">
-                  a.n. {b.accountHolder}
-                </div>
-                {b.branch && <div className="text-[11px] text-slate-400 mt-1">{b.branch}</div>}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              {/* QRIS Image Preview */}
+              <div className="md:col-span-4 flex flex-col items-center justify-center p-4 bg-white border-2 border-slate-300 rounded-2xl shadow-xs">
+                {storeSettings.qrisImageUrl ? (
+                  <div className="space-y-2 text-center w-full">
+                    <div className="w-full aspect-square max-h-56 bg-white p-2 border border-slate-300 rounded-xl flex items-center justify-center overflow-hidden">
+                      <img
+                        src={storeSettings.qrisImageUrl}
+                        alt="QRIS Toko Grosir Nusantara"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span className="inline-block text-[11px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300 px-2.5 py-0.5 rounded-full">
+                      ✓ QRIS Aktif di Checkout
+                    </span>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-slate-500 space-y-2">
+                    <QrCode className="w-12 h-12 mx-auto text-slate-400 stroke-1" />
+                    <p className="text-xs font-bold text-slate-800">Belum ada foto QRIS toko yang diunggah.</p>
+                  </div>
+                )}
+              </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-end gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingBank(b);
-                      setIsBankModalOpen(true);
+              {/* Upload Dropzone */}
+              <div className="md:col-span-8">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingQris(true);
+                  }}
+                  onDragLeave={() => setIsDraggingQris(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingQris(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleUploadQrisFile(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+                    isDraggingQris
+                      ? 'border-emerald-600 bg-emerald-100/50 scale-[1.01]'
+                      : 'border-emerald-300 hover:border-emerald-500 bg-white'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    id="qris-file-upload-input"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleUploadQrisFile(e.target.files[0]);
+                      }
                     }}
-                    className="px-2.5 py-1 text-slate-700 hover:text-blue-900 hover:bg-slate-100 rounded-md font-semibold cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteBank(b.id)}
-                    className="px-2.5 py-1 text-red-600 hover:bg-red-50 rounded-md font-semibold cursor-pointer"
-                  >
-                    Hapus
-                  </button>
+                    className="hidden"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    {isUploadingQris ? (
+                      <div className="flex items-center gap-2 py-4 text-emerald-950 font-black text-xs">
+                        <Loader2 className="w-5 h-5 animate-spin text-emerald-700" />
+                        <span>Sedang mengompresi &amp; menyimpan foto QRIS...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shadow-xs">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div className="text-xs font-black text-slate-950">
+                          {storeSettings.qrisImageUrl ? 'Ganti Foto QRIS Toko' : 'Tarik & Letakkan Foto QRIS Toko di Sini'}
+                        </div>
+                        <p className="text-[11px] text-slate-700 font-bold max-w-sm">
+                          Format JPG, PNG, atau WEBP. Gambar otomatis dikompresi agar loading cepat saat pelanggan scan bayar.
+                        </p>
+                        <label
+                          htmlFor="qris-file-upload-input"
+                          className="mt-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-xs transition-colors"
+                        >
+                          Pilih File Foto QRIS dari Perangkat
+                        </label>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
+            </div>
+          </div>
+
+          {/* BAGIAN 2: DAFTAR REKENING BANK & E-WALLET */}
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-950">Daftar Rekening Bank &amp; E-Wallet</h3>
+                <p className="text-xs text-slate-700 font-bold mt-0.5">
+                  Pilihan metode transfer pembayaran yang tersedia bagi pelanggan saat menyelesaikan pesanan di checkout.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingBank({
+                    id: `bank-${Date.now()}`,
+                    bankName: '',
+                    accountNumber: '',
+                    accountHolder: 'GROSIR NUSANTARA',
+                    branch: '',
+                    active: true,
+                  });
+                  setIsBankModalOpen(true);
+                }}
+                className="px-4 py-2 bg-slate-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4 text-amber-400" />
+                <span>+ Tambah Rekening Baru</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bankAccounts.map((b) => (
+                <div
+                  key={b.id}
+                  className="p-4 rounded-2xl border-2 border-slate-300 bg-white hover:border-amber-400 hover:shadow-md transition-all relative flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div className="font-black text-sm text-slate-950">{b.bankName}</div>
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                          b.active !== false
+                            ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                            : 'bg-slate-200 text-slate-700 border-slate-300'
+                        }`}
+                      >
+                        {b.active !== false ? 'Aktif' : 'Non-aktif'}
+                      </span>
+                    </div>
+                    <div className="mt-2 font-mono font-black text-slate-950 text-base tracking-wider bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      {b.accountNumber}
+                    </div>
+                    <div className="text-xs text-slate-800 font-black mt-1.5">
+                      a.n. {b.accountHolder}
+                    </div>
+                    {b.branch && (
+                      <div className="text-[11px] text-slate-600 font-bold mt-0.5">
+                        Keterangan: {b.branch}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-end gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBank(b);
+                        setIsBankModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-950 text-slate-950 rounded-lg font-black border border-slate-300 cursor-pointer transition-colors"
+                    >
+                      Edit Rekening
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBank(b.id)}
+                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-lg font-black border border-rose-200 cursor-pointer transition-colors"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* TAB 4: MEDIA PANDUAN CARA ORDER */}
+      {/* TAB 3: MEDIA PANDUAN CARA ORDER */}
       {/* ======================================================== */}
       {activeTab === 'guide' && (
         <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Media Panduan Cara Order Pelanggan</h3>
-              <p className="text-xs text-slate-500">Foto, video, atau langkah alur cara kulakan bagi pembeli baru.</p>
+              <h3 className="text-sm font-black text-slate-950">Media Panduan Cara Order Pelanggan</h3>
+              <p className="text-xs text-slate-700 font-bold mt-0.5">
+                Foto, video, atau langkah alur cara belanja bagi pembeli baru di etalase web.
+              </p>
             </div>
             <button
               type="button"
@@ -640,48 +632,50 @@ export const AdminCustomizationView: React.FC = () => {
                 });
                 setIsGuideModalOpen(true);
               }}
-              className="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-4 py-2 bg-slate-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors self-start sm:self-auto"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah Panduan</span>
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>+ Tambah Panduan</span>
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {orderGuides.map((g) => (
-              <div key={g.id} className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-col justify-between">
+              <div
+                key={g.id}
+                className="p-4 rounded-2xl border-2 border-slate-300 bg-white hover:border-amber-400 hover:shadow-md transition-all relative flex flex-col justify-between"
+              >
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-extrabold uppercase">
-                      Langkah {g.stepNumber || 1}
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                      {g.stepNumber || '•'}
                     </span>
-                    <span className="text-[10px] text-slate-400 capitalize">{g.type}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${g.active !== false ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-slate-200 text-slate-700 border-slate-300'}`}>
+                      {g.active !== false ? 'Tampil' : 'Disembunyikan'}
+                    </span>
                   </div>
-                  <h4 className="font-bold text-slate-900 text-sm">{g.title}</h4>
-                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{g.description}</p>
 
-                  {g.mediaUrl && (
-                    <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 aspect-16/9 bg-slate-100">
-                      <img src={g.mediaUrl} alt={g.title} className="w-full h-full object-cover" />
-                    </div>
-                  )}
+                  <h4 className="font-black text-sm text-slate-950 mb-1">{g.title}</h4>
+                  <p className="text-xs text-slate-800 font-bold leading-relaxed line-clamp-3">
+                    {g.description}
+                  </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-end gap-2 text-xs">
                   <button
                     type="button"
                     onClick={() => {
                       setEditingGuide(g);
                       setIsGuideModalOpen(true);
                     }}
-                    className="px-2.5 py-1 text-slate-700 hover:text-purple-800 hover:bg-slate-50 rounded-md font-semibold cursor-pointer"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-950 text-slate-950 rounded-lg font-black border border-slate-300 cursor-pointer transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteGuide(g.id)}
-                    className="px-2.5 py-1 text-red-600 hover:bg-red-50 rounded-md font-semibold cursor-pointer"
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-lg font-black border border-rose-200 cursor-pointer transition-colors"
                   >
                     Hapus
                   </button>
@@ -693,110 +687,23 @@ export const AdminCustomizationView: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL EDIT / ADD COURIER */}
-      {/* ======================================================== */}
-      {isCourierModalOpen && editingCourier && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {editingCourier.name ? 'Edit Ekspedisi' : 'Tambah Ekspedisi Kargo'}
-              </h3>
-              <button type="button" onClick={() => setIsCourierModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveCourier(editingCourier);
-              }}
-              className="space-y-3 text-xs"
-            >
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Nama Ekspedisi</label>
-                <input
-                  type="text"
-                  required
-                  value={editingCourier.name}
-                  onChange={(e) => setEditingCourier({ ...editingCourier, name: e.target.value })}
-                  placeholder="Contoh: Indah Cargo Logistik"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Jenis Layanan</label>
-                  <input
-                    type="text"
-                    value={editingCourier.type}
-                    onChange={(e) => setEditingCourier({ ...editingCourier, type: e.target.value })}
-                    placeholder="Kargo Darat/Laut"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tarif per Kg (Rp)</label>
-                  <input
-                    type="number"
-                    required
-                    value={editingCourier.ratePerKg}
-                    onChange={(e) => setEditingCourier({ ...editingCourier, ratePerKg: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Min. Berat (kg)</label>
-                  <input
-                    type="number"
-                    required
-                    value={editingCourier.minWeight}
-                    onChange={(e) => setEditingCourier({ ...editingCourier, minWeight: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Estimasi Tiba</label>
-                  <input
-                    type="text"
-                    value={editingCourier.estimatedDays}
-                    onChange={(e) => setEditingCourier({ ...editingCourier, estimatedDays: e.target.value })}
-                    placeholder="2-4 Hari"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button type="submit" className="flex-1 py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-lg text-xs cursor-pointer">
-                  Simpan Ekspedisi
-                </button>
-                <button type="button" onClick={() => setIsCourierModalOpen(false)} className="px-4 py-2.5 bg-slate-150 text-slate-700 font-semibold rounded-lg text-xs">
-                  Batal
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL EDIT / ADD BANK */}
+      {/* MODAL EDIT / ADD BANK ACCOUNT */}
       {/* ======================================================== */}
       {isBankModalOpen && editingBank && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {editingBank.bankName ? 'Edit Metode Pembayaran' : 'Tambah Rekening Bank / QRIS'}
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-slate-300 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
+              <h3 className="font-black text-slate-950 text-sm">
+                {editingBank.id && bankAccounts.some((b) => b.id === editingBank.id)
+                  ? 'Edit Metode Pembayaran'
+                  : 'Tambah Rekening Bank Baru'}
               </h3>
-              <button type="button" onClick={() => setIsBankModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setIsBankModalOpen(false)}
+                className="text-slate-500 hover:text-black p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5 text-slate-950" />
               </button>
             </div>
 
@@ -805,60 +712,86 @@ export const AdminCustomizationView: React.FC = () => {
                 e.preventDefault();
                 handleSaveBank(editingBank);
               }}
-              className="space-y-3 text-xs"
+              className="space-y-3.5 text-xs font-bold"
             >
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nama Bank / Dompet Digital</label>
+                <label className="font-black text-slate-950 block mb-1">
+                  Nama Bank / E-Wallet <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingBank.bankName}
                   onChange={(e) => setEditingBank({ ...editingBank, bankName: e.target.value })}
-                  placeholder="Contoh: Bank BCA atau QRIS Grosir"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  placeholder="Contoh: Bank BCA, Bank Mandiri, GoPay, OVO"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nomor Rekening / NMID</label>
+                <label className="font-black text-slate-950 block mb-1">
+                  Nomor Rekening / No. HP E-Wallet <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingBank.accountNumber}
                   onChange={(e) => setEditingBank({ ...editingBank, accountNumber: e.target.value })}
-                  placeholder="Contoh: 032-198-4421"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
+                  placeholder="Contoh: 032-198-4421 atau 08123456789"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-mono font-black text-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Atas Nama (Pemilik Rekening)</label>
+                <label className="font-black text-slate-950 block mb-1">
+                  Atas Nama Pemilik Rekening <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingBank.accountHolder}
                   onChange={(e) => setEditingBank({ ...editingBank, accountHolder: e.target.value })}
                   placeholder="Contoh: GROSIR NUSANTARA OFFICIAL"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-black text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Keterangan / Cabang</label>
+                <label className="font-black text-slate-950 block mb-1">Keterangan / Cabang (Opsional)</label>
                 <input
                   type="text"
                   value={editingBank.branch || ''}
                   onChange={(e) => setEditingBank({ ...editingBank, branch: e.target.value })}
-                  placeholder="KCU Jakarta atau Bebas Biaya Admin"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  placeholder="Contoh: KCU Jakarta atau Bebas Biaya Admin"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
-              <div className="pt-2 flex gap-2">
-                <button type="submit" className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs cursor-pointer">
-                  Simpan Rekening
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="bank-active-toggle"
+                  checked={editingBank.active !== false}
+                  onChange={(e) => setEditingBank({ ...editingBank, active: e.target.checked })}
+                  className="w-4 h-4 text-emerald-600 rounded accent-emerald-600 cursor-pointer"
+                />
+                <label htmlFor="bank-active-toggle" className="text-xs font-black text-slate-950 cursor-pointer select-none">
+                  Aktifkan metode pembayaran ini di checkout pembeli
+                </label>
+              </div>
+
+              <div className="pt-3 flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-xs cursor-pointer shadow-xs transition-colors"
+                >
+                  Simpan Metode Pembayaran
                 </button>
-                <button type="button" onClick={() => setIsBankModalOpen(false)} className="px-4 py-2.5 bg-slate-150 text-slate-700 font-semibold rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsBankModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black rounded-xl text-xs cursor-pointer"
+                >
                   Batal
                 </button>
               </div>
@@ -868,17 +801,21 @@ export const AdminCustomizationView: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL EDIT / ADD GUIDE */}
+      {/* MODAL EDIT / ADD PANDUAN */}
       {/* ======================================================== */}
       {isGuideModalOpen && editingGuide && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {editingGuide.title ? 'Edit Panduan Order' : 'Tambah Panduan Cara Order'}
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-slate-300 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
+              <h3 className="font-black text-slate-950 text-sm">
+                {editingGuide.title ? 'Edit Panduan Belanja' : 'Tambah Panduan Belanja'}
               </h3>
-              <button type="button" onClick={() => setIsGuideModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setIsGuideModalOpen(false)}
+                className="text-slate-500 hover:text-black p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5 text-slate-950" />
               </button>
             </div>
 
@@ -887,148 +824,79 @@ export const AdminCustomizationView: React.FC = () => {
                 e.preventDefault();
                 handleSaveGuide(editingGuide);
               }}
-              className="space-y-3 text-xs"
+              className="space-y-3.5 text-xs font-bold"
             >
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-1">
-                  <label className="font-bold text-slate-700 block mb-1">Nomor Langkah</label>
-                  <input
-                    type="number"
-                    value={editingGuide.stepNumber || 1}
-                    onChange={(e) => setEditingGuide({ ...editingGuide, stepNumber: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">Tipe Panduan</label>
-                  <select
-                    value={editingGuide.type}
-                    onChange={(e) => setEditingGuide({ ...editingGuide, type: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="step">Langkah Alur</option>
-                    <option value="image">Foto / Infografis</option>
-                    <option value="video">Tautan Video Tutorial</option>
-                  </select>
-                </div>
+              <div>
+                <label className="font-black text-slate-950 block mb-1">
+                  Nomor Langkah / Urutan <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={editingGuide.stepNumber || 1}
+                  onChange={(e) => setEditingGuide({ ...editingGuide, stepNumber: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2 border-2 border-slate-300 rounded-xl bg-white font-mono font-black text-slate-950"
+                />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Judul Panduan</label>
+                <label className="font-black text-slate-950 block mb-1">
+                  Judul Langkah Panduan <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingGuide.title}
                   onChange={(e) => setEditingGuide({ ...editingGuide, title: e.target.value })}
-                  placeholder="Contoh: Cara Memilih Ekspedisi Kargo Hemat"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  placeholder="Contoh: Langkah 1: Pilih Produk"
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-black text-slate-950"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Deskripsi &amp; Petunjuk</label>
+                <label className="font-black text-slate-950 block mb-1">
+                  Deskripsi Penjelasan Panduan <span className="text-red-600">*</span>
+                </label>
                 <textarea
                   rows={3}
                   required
                   value={editingGuide.description || ''}
                   onChange={(e) => setEditingGuide({ ...editingGuide, description: e.target.value })}
-                  placeholder="Jelaskan langkah belanja ini agar pelanggan memahami dengan mudah"
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
+                  placeholder="Tuliskan panduan cara belanja lengkap bagi pembeli..."
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-300 rounded-xl bg-white font-bold text-slate-950"
                 />
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Foto / Media Panduan</label>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id="guide-media-file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setIsUploadingGuideMedia(true);
-                          try {
-                            const compressed = await compressImageFile(file);
-                            setEditingGuide({ ...editingGuide, mediaUrl: compressed });
-                            showToast('Foto panduan berhasil diunggah!', 'success');
-                          } catch (err: any) {
-                            showToast('Gagal memproses gambar: ' + err.message, 'error');
-                          } finally {
-                            setIsUploadingGuideMedia(false);
-                          }
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="guide-media-file"
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{isUploadingGuideMedia ? 'Mengompresi...' : 'Upload Foto dari HP / PC'}</span>
-                    </label>
-                  </div>
-                  <input
-                    type="text"
-                    value={editingGuide.mediaUrl || ''}
-                    onChange={(e) => setEditingGuide({ ...editingGuide, mediaUrl: e.target.value })}
-                    placeholder="Atau tautan URL video Youtube / gambar panduan..."
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-[11px]"
-                  />
-                </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="guide-active-toggle"
+                  checked={editingGuide.active !== false}
+                  onChange={(e) => setEditingGuide({ ...editingGuide, active: e.target.checked })}
+                  className="w-4 h-4 text-emerald-600 rounded accent-emerald-600 cursor-pointer"
+                />
+                <label htmlFor="guide-active-toggle" className="text-xs font-black text-slate-950 cursor-pointer select-none">
+                  Tampilkan langkah panduan ini di etalase web
+                </label>
               </div>
 
-              <div className="pt-2 flex gap-2">
-                <button type="submit" className="flex-1 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-lg text-xs cursor-pointer">
+              <div className="pt-3 flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl text-xs cursor-pointer shadow-xs transition-colors"
+                >
                   Simpan Panduan
                 </button>
-                <button type="button" onClick={() => setIsGuideModalOpen(false)} className="px-4 py-2.5 bg-slate-150 text-slate-700 font-semibold rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsGuideModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black rounded-xl text-xs cursor-pointer"
+                >
                   Batal
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* In-App Deletion Confirmation Modal (eliminating window.confirm) */}
-      {deleteConfirmItem && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border-2 border-red-500 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 text-red-600 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-base font-black text-slate-950">
-                Konfirmasi Hapus Data
-              </h3>
-            </div>
-
-            <p className="text-xs font-bold text-slate-900 mb-5 leading-relaxed">
-              {deleteConfirmItem.title}
-            </p>
-
-            <div className="flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmItem(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteConfirmItem.onConfirm();
-                  setDeleteConfirmItem(null);
-                }}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl shadow-md transition-colors cursor-pointer"
-              >
-                Ya, Hapus Sekarang
-              </button>
-            </div>
           </div>
         </div>
       )}
